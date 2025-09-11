@@ -1,0 +1,592 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  PARENT
+  TEACHER
+  STUDENT
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  LONG_ANSWER
+  FILL_BLANKS
+  MATCHING
+  ORDERING
+  MATH_PROBLEM
+  CODING
+  DIAGRAM
+}
+
+enum ExamStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum GradingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REVIEWED
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String?   @unique
+  username          String?   @unique
+  password          String
+  firstName         String?
+  lastName          String?
+  name              String?
+  role              Role      @default(STUDENT)
+  emailVerified     DateTime?
+  image             String?
+  
+  // Relations
+  parentId          String?
+  parent            User?     @relation("ParentChild", fields: [parentId], references: [id])
+  children          User[]    @relation("ParentChild")
+  
+  // Teacher relations
+  createdById       String?
+  createdBy         User?     @relation("CreatedUsers", fields: [createdById], references: [id])
+  createdUsers      User[]    @relation("CreatedUsers")
+  
+  createdExams      Exam[]    @relation("ExamCreator")
+  examAttempts      ExamAttempt[]
+  grades            Grade[]
+  
+  // Assignment relations
+  assignedExams     ExamAssignment[] @relation("StudentAssignments")
+  createdAssignments ExamAssignment[] @relation("AssignmentCreator")
+  
+  // Class relations
+  classesAsStudent  ClassStudent[]
+  classesAsTeacher  Class[]   @relation("ClassTeacher")
+  createdClasses    Class[]   @relation("ClassCreator")
+  
+  // Portfolio relations
+  portfolios        Portfolio[] @relation("StudentPortfolio")
+  
+  // Community relations
+  communityPosts    CommunityPost[] @relation("CommunityPosts")
+  postLikes         PostLike[] @relation("PostLikes")
+  
+  // Performance tracking
+  performanceData   StudentPerformanceData[] @relation("PerformanceData")
+  
+  // Standards tracking
+  standardProgress  StudentStandardProgress[] @relation("StudentStandardProgress")
+  
+  // System fields
+  isActive          Boolean   @default(true)
+  lastLogin         DateTime?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  
+  @@map("users")
+}
+
+model Exam {
+  id                String        @id @default(cuid())
+  title             String
+  description       String?
+  subject           String
+  gradeLevel        Int
+  
+  // AI Generation Config
+  aiGenerated       Boolean       @default(true)
+  aiConfig          Json?         // Stores AI generation parameters
+  
+  // Exam Settings
+  duration          Int?          // in minutes
+  totalMarks        Int           @default(100)
+  passingMarks      Int           @default(50)
+  
+  status            ExamStatus    @default(DRAFT)
+  scheduledFor      DateTime?
+  
+  // Relations
+  creatorId         String
+  creator           User          @relation("ExamCreator", fields: [creatorId], references: [id])
+  
+  questions         Question[]
+  attempts          ExamAttempt[]
+  assignments       ExamAssignment[]
+  
+  // Curriculum standards
+  standards         CurriculumStandard[] @relation("ExamStandards")
+  
+  // Metadata
+  instructions      String?
+  allowedResources  String[]      @default([])
+  
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  
+  @@index([creatorId])
+  @@map("exams")
+}
+
+model Question {
+  id                String        @id @default(cuid())
+  examId            String
+  exam              Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  
+  type              QuestionType
+  question          String        @db.Text
+  
+  // Different answer formats based on type
+  options           Json?         // For MCQ, matching
+  correctAnswer     Json          // Can be string, array, or object based on type
+  
+  marks             Int           @default(5)
+  
+  // AI specific fields
+  aiGenerated       Boolean       @default(true)
+  difficulty        String?       // easy, medium, hard
+  topic             String?
+  
+  // For better grading
+  gradingRubric     Json?         // AI grading criteria
+  sampleAnswer      String?       @db.Text
+  
+  order             Int           @default(0)
+  
+  // Relations
+  answers           Answer[]
+  standards         CurriculumStandard[] @relation("QuestionStandards")
+  
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  
+  @@index([examId])
+  @@map("questions")
+}
+
+model ExamAttempt {
+  id                String        @id @default(cuid())
+  
+  examId            String
+  exam              Exam          @relation(fields: [examId], references: [id])
+  
+  studentId         String
+  student           User          @relation(fields: [studentId], references: [id])
+  
+  startedAt         DateTime      @default(now())
+  submittedAt       DateTime?
+  timeSpent         Int?          // in minutes
+  
+  // Status
+  isCompleted       Boolean       @default(false)
+  isGraded          Boolean       @default(false)
+  
+  // Relations
+  answers           Answer[]
+  grade             Grade?
+  
+  @@unique([examId, studentId])
+  @@index([studentId])
+  @@map("exam_attempts")
+}
+
+model Answer {
+  id                String        @id @default(cuid())
+  
+  attemptId         String
+  attempt           ExamAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  
+  questionId        String
+  question          Question      @relation(fields: [questionId], references: [id])
+  
+  // Student's answer
+  answer            Json          // Can store any type of answer
+  
+  // AI Grading
+  aiScore           Float?        // Score given by AI
+  aiFeedback        String?       @db.Text
+  aiGradedAt        DateTime?
+  
+  // Manual override
+  manualScore       Float?
+  manualFeedback    String?       @db.Text
+  reviewedBy        String?
+  
+  finalScore        Float?        // Final score (manual overrides AI)
+  
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  
+  @@index([attemptId])
+  @@map("answers")
+}
+
+model Grade {
+  id                String        @id @default(cuid())
+  
+  attemptId         String        @unique
+  attempt           ExamAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  
+  studentId         String
+  student           User          @relation(fields: [studentId], references: [id])
+  
+  totalScore        Float
+  percentage        Float
+  grade             String?       // A, B, C, etc.
+  
+  status            GradingStatus @default(PENDING)
+  
+  // AI Analysis
+  aiAnalysis        Json?         // Strengths, weaknesses, recommendations
+  
+  // Feedback
+  overallFeedback   String?       @db.Text
+  
+  // Publishing
+  isPublished       Boolean       @default(false)
+  publishedAt       DateTime?
+  publishedBy       String?
+  
+  gradedAt          DateTime      @default(now())
+  
+  @@index([studentId])
+  @@map("grades")
+}
+
+model Class {
+  id                String        @id @default(cuid())
+  name              String
+  description       String?
+  gradeLevel        Int?
+  subject           String?
+  
+  // Relations
+  teacherId         String
+  teacher           User          @relation("ClassTeacher", fields: [teacherId], references: [id])
+  
+  createdById       String
+  createdBy         User          @relation("ClassCreator", fields: [createdById], references: [id])
+  
+  students          ClassStudent[]
+  examAssignments   ExamAssignment[]
+  
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  
+  @@index([teacherId])
+  @@index([createdById])
+  @@map("classes")
+}
+
+model ClassStudent {
+  id                String        @id @default(cuid())
+  
+  classId           String
+  class             Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  
+  studentId         String
+  student           User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  joinedAt          DateTime      @default(now())
+  
+  @@unique([classId, studentId])
+  @@index([classId])
+  @@index([studentId])
+  @@map("class_students")
+}
+
+model ExamAssignment {
+  id                String        @id @default(cuid())
+  
+  examId            String
+  exam              Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  
+  // Can be assigned to individual students or classes
+  studentId         String?
+  student           User?         @relation("StudentAssignments", fields: [studentId], references: [id])
+  
+  classId           String?
+  class             Class?        @relation(fields: [classId], references: [id])
+  
+  assignedBy        String
+  assignedByUser    User          @relation("AssignmentCreator", fields: [assignedBy], references: [id])
+  
+  // Assignment settings
+  dueDate           DateTime?
+  startDate         DateTime?
+  allowLateSubmission Boolean     @default(false)
+  maxAttempts       Int           @default(1)
+  
+  // Status tracking
+  isActive          Boolean       @default(true)
+  
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  
+  @@unique([examId, studentId])
+  @@index([examId])
+  @@index([studentId])
+  @@index([classId])
+  @@index([assignedBy])
+  @@map("exam_assignments")
+}
+
+model SystemSettings {
+  id                String        @id @default(cuid())
+  key               String        @unique
+  value             Json
+  description       String?
+  
+  updatedAt         DateTime      @updatedAt
+  
+  @@map("system_settings")
+}
+
+model AuditLog {
+  id                String        @id @default(cuid())
+  userId            String
+  action            String
+  entity            String
+  entityId          String?
+  metadata          Json?
+  
+  createdAt         DateTime      @default(now())
+  
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model Portfolio {
+  id          String    @id @default(cuid())
+  studentId   String
+  student     User      @relation("StudentPortfolio", fields: [studentId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?   @db.Text
+  isPublic    Boolean   @default(false)
+  
+  items       PortfolioItem[]
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  @@index([studentId])
+  @@map("portfolios")
+}
+
+model PortfolioItem {
+  id            String     @id @default(cuid())
+  portfolioId   String
+  portfolio     Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  title         String
+  description   String?    @db.Text
+  type          PortfolioItemType
+  content       Json       // Stores different content based on type
+  subject       String?
+  tags          String[]   @default([])
+  
+  // File attachments
+  attachments   String[]   @default([]) // File URLs
+  
+  // Reflection and learning
+  reflection    String?    @db.Text
+  learningGoals String[]   @default([])
+  skills        String[]   @default([])
+  
+  // Assessment data
+  grade         String?
+  feedback      String?    @db.Text
+  assessedBy    String?
+  assessedAt    DateTime?
+  
+  // Metadata
+  completedAt   DateTime?
+  isPublished   Boolean    @default(false)
+  order         Int        @default(0)
+  
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  
+  @@index([portfolioId])
+  @@map("portfolio_items")
+}
+
+enum PortfolioItemType {
+  ASSIGNMENT
+  PROJECT
+  ARTWORK
+  WRITING
+  VIDEO
+  AUDIO
+  PHOTO
+  PRESENTATION
+  RESEARCH
+  EXPERIMENT
+  FIELD_TRIP
+  REFLECTION
+  ACHIEVEMENT
+  CERTIFICATE
+}
+
+model CommunityPost {
+  id          String      @id @default(cuid())
+  authorId    String
+  author      User        @relation("CommunityPosts", fields: [authorId], references: [id])
+  
+  title       String
+  content     String      @db.Text
+  type        PostType
+  category    String?     // Subject area or topic
+  tags        String[]    @default([])
+  
+  // Forum/Discussion features
+  parentId    String?     // For replies
+  parent      CommunityPost? @relation("PostReplies", fields: [parentId], references: [id])
+  replies     CommunityPost[] @relation("PostReplies")
+  
+  // Engagement
+  likes       PostLike[]
+  views       Int         @default(0)
+  
+  // Moderation
+  isPublished Boolean     @default(true)
+  isPinned    Boolean     @default(false)
+  
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  
+  @@index([authorId])
+  @@index([type])
+  @@index([category])
+  @@map("community_posts")
+}
+
+enum PostType {
+  QUESTION
+  DISCUSSION
+  RESOURCE
+  SUCCESS_STORY
+  TIP
+  ANNOUNCEMENT
+}
+
+model PostLike {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation("PostLikes", fields: [userId], references: [id])
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime      @default(now()) @map("created_at")
+  
+  @@unique([userId, postId])
+  @@index([postId])
+  @@map("post_likes")
+}
+
+model StudentPerformanceData {
+  id            String   @id @default(cuid())
+  studentId     String
+  student       User     @relation("PerformanceData", fields: [studentId], references: [id])
+  
+  subject       String
+  topic         String?
+  skillLevel    Int      @default(1) // 1-10 scale
+  difficultyPreference Int @default(5) // 1-10 scale
+  
+  // Performance metrics
+  accuracy      Float    @default(0.0) // 0-100%
+  speed         Float?   // Questions per minute
+  consistency   Float    @default(0.0) // Performance variance
+  
+  // Learning style preferences
+  preferredQuestionTypes String[] @default([])
+  strengths     String[] @default([])
+  weaknesses    String[] @default([])
+  
+  // Adaptive testing data
+  lastExamScore Float?
+  trending      String   @default("STABLE") // IMPROVING, DECLINING, STABLE
+  
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  @@unique([studentId, subject])
+  @@index([studentId])
+  @@map("student_performance_data")
+}
+
+model CurriculumStandard {
+  id          String   @id @default(cuid())
+  country     String   // US, UK, AU, NZ
+  system      String   // Common Core, National Curriculum, etc.
+  subject     String
+  gradeLevel  Int
+  
+  code        String   // Standard code (e.g., CCSS.MATH.1.OA.A.1)
+  title       String
+  description String   @db.Text
+  category    String?  // Algebra, Reading, Science, etc.
+  
+  // Learning objectives
+  objectives  String[] @default([])
+  skills      String[] @default([])
+  
+  // Linked questions and exams
+  questions   Question[] @relation("QuestionStandards")
+  exams       Exam[]     @relation("ExamStandards")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  @@unique([country, system, code])
+  @@index([country, system])
+  @@index([subject, gradeLevel])
+  @@map("curriculum_standards")
+}
+
+model StudentStandardProgress {
+  id           String   @id @default(cuid())
+  studentId    String
+  student      User     @relation("StudentStandardProgress", fields: [studentId], references: [id])
+  
+  standardId   String
+  standard     CurriculumStandard @relation(fields: [standardId], references: [id])
+  
+  // Progress tracking
+  status       StandardStatus @default(NOT_STARTED)
+  mastery      Float    @default(0.0) // 0-100%
+  attempts     Int      @default(0)
+  
+  // Timestamps
+  startedAt    DateTime?
+  masteredAt   DateTime?
+  lastAttempt  DateTime?
+  
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  @@unique([studentId, standardId])
+  @@index([studentId])
+  @@index([standardId])
+  @@map("student_standard_progress")
+}
+
+enum StandardStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  MASTERED
+  NEEDS_REVIEW
+}
