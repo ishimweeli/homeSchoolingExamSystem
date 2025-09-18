@@ -1,0 +1,50 @@
+{
+  "testName": "Complete Study Module Flow Test",
+  "timestamp": "2025-09-12T05:18:33.207Z",
+  "baseUrl": "http://localhost:3003",
+  "results": {
+    "teacherLogin": false,
+    "moduleCreation": false,
+    "aiGenerationReliable": false,
+    "studentAssignment": false,
+    "studentAccess": false,
+    "interactiveFeatures": false,
+    "xpAndLives": false,
+    "stepProgression": false,
+    "moduleCompletion": false
+  },
+  "errors": [
+    "Test error: Teacher login failed"
+  ],
+  "screenshots": [
+    {
+      "name": "01-login",
+      "filename": "1757654316510-01-login.png",
+      "filepath": "screenshots\\complete-study-flow\\1757654316510-01-login.png",
+      "description": "Login page",
+      "timestamp": "2025-09-12T05:18:37.388Z"
+    },
+    {
+      "name": "02-teacher-dashboard",
+      "filename": "1757654319835-02-teacher-dashboard.png",
+      "filepath": "screenshots\\complete-study-flow\\1757654319835-02-teacher-dashboard.png",
+      "description": "Teacher dashboard",
+      "timestamp": "2025-09-12T05:18:40.138Z"
+    },
+    {
+      "name": "16-test-error",
+      "filename": "1757654320139-16-test-error.png",
+      "filepath": "screenshots\\complete-study-flow\\1757654320139-16-test-error.png",
+      "description": "Test failure",
+      "timestamp": "2025-09-12T05:18:41.810Z"
+    }
+  ],
+  "moduleId": null,
+  "generationTime": 0,
+  "completionStats": {
+    "total": 9,
+    "passed": 0,
+    "failed": 9,
+    "successRate": 0
+  }
+}

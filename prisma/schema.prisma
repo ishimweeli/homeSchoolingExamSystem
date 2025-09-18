@@ -90,6 +90,18 @@ model User {
   // Standards tracking
   standardProgress  StudentStandardProgress[] @relation("StudentStandardProgress")
   
+  // Lesson plan relations
+  createdLessonPlans LessonPlan[] @relation("CreatedLessonPlans")
+  lessonAssignments LessonPlanAssignment[] @relation("StudentLessonAssignments")  
+  createdLessonAssignments LessonPlanAssignment[] @relation("LessonAssignmentCreator")
+  
+  // Study module relations (Interactive Learning)
+  createdStudyModules StudyModule[] @relation("CreatedStudyModules")
+  studyAssignments StudyModuleAssignment[] @relation("StudentStudyAssignments")
+  createdStudyAssignments StudyModuleAssignment[] @relation("StudyAssignmentCreator")
+  stepProgress StudentStepProgress[] @relation("StudentStepProgress")
+  studyProgress StudyProgress[] @relation("StudentProgress")
+  
   // System fields
   isActive          Boolean   @default(true)
   lastLogin         DateTime?
@@ -114,6 +126,9 @@ model Exam {
   duration          Int?          // in minutes
   totalMarks        Int           @default(100)
   passingMarks      Int           @default(50)
+  
+  // Result publishing settings
+  autoPublishResults Boolean      @default(true) // true = immediate, false = manual
   
   status            ExamStatus    @default(DRAFT)
   scheduledFor      DateTime?
@@ -151,6 +166,10 @@ model Question {
   // Different answer formats based on type
   options           Json?         // For MCQ, matching
   correctAnswer     Json          // Can be string, array, or object based on type
+  
+  // File attachments for rich questions
+  imageUrl          String?       // Question image/diagram
+  attachments       String[]      @default([]) // Additional files
   
   marks             Int           @default(5)
   
@@ -213,6 +232,9 @@ model Answer {
   
   // Student's answer
   answer            Json          // Can store any type of answer
+  
+  // File submissions
+  submittedFiles    String[]      @default([]) // Student uploaded files
   
   // AI Grading
   aiScore           Float?        // Score given by AI
@@ -281,6 +303,7 @@ model Class {
   
   students          ClassStudent[]
   examAssignments   ExamAssignment[]
+  lessonAssignments LessonPlanAssignment[]
   
   isActive          Boolean       @default(true)
   createdAt         DateTime      @default(now()) @map("created_at")
@@ -549,6 +572,9 @@ model CurriculumStandard {
   questions   Question[] @relation("QuestionStandards")
   exams       Exam[]     @relation("ExamStandards")
   
+  // Student progress tracking
+  studentProgress StudentStandardProgress[]
+  
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   
@@ -589,4 +615,309 @@ enum StandardStatus {
   IN_PROGRESS
   MASTERED
   NEEDS_REVIEW
+}
+
+model LessonPlan {
+  id            String   @id @default(cuid())
+  title         String
+  topic         String
+  subject       String
+  gradeLevel    Int
+  duration      String   // "1 hour", "1 day", "1 week", etc.
+  
+  // Lesson plan content (JSON)
+  content       Json     // Stores the full lesson plan structure
+  
+  // Creator
+  createdBy     String
+  creator       User     @relation("CreatedLessonPlans", fields: [createdBy], references: [id])
+  
+  // Status
+  isPublished   Boolean  @default(false)
+  isShared      Boolean  @default(false)
+  
+  // Assignments
+  assignments   LessonPlanAssignment[]
+  
+  // Metadata
+  tags          String[] @default([])
+  difficulty    String?  // "easy", "medium", "hard"
+  estimatedTime String?  // "30 minutes prep"
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  @@index([createdBy])
+  @@index([subject, gradeLevel])
+  @@map("lesson_plans")
+}
+
+model LessonPlanAssignment {
+  id            String     @id @default(cuid())
+  
+  lessonPlanId  String
+  lessonPlan    LessonPlan @relation(fields: [lessonPlanId], references: [id], onDelete: Cascade)
+  
+  // Assigned to student or class
+  studentId     String?
+  student       User?      @relation("StudentLessonAssignments", fields: [studentId], references: [id])
+  
+  classId       String?
+  class         Class?     @relation(fields: [classId], references: [id])
+  
+  // Assignment settings
+  assignedBy    String
+  assignedByUser User      @relation("LessonAssignmentCreator", fields: [assignedBy], references: [id])
+  
+  dueDate       DateTime?
+  completedAt   DateTime?
+  isCompleted   Boolean    @default(false)
+  
+  // Progress tracking
+  progress      Json?      // Track completion of activities
+  studentNotes  String?    @db.Text
+  
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  
+  @@index([studentId])
+  @@index([classId])
+  @@index([assignedBy])
+  @@map("lesson_plan_assignments")
+}
+
+// Interactive Study Materials (Like Duolingo)
+model StudyModule {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  topic         String
+  subject       String
+  gradeLevel    Int
+  
+  // AI Generated Content
+  aiGenerated   Boolean  @default(true)
+  difficulty    String   @default("medium") // easy, medium, hard
+  
+  // Module Settings
+  totalLessons  Int      @default(10)
+  passingScore  Int      @default(95) // Required score to progress
+  livesEnabled  Boolean  @default(true)
+  maxLives      Int      @default(3)
+  
+  // Creator
+  createdBy     String
+  creator       User     @relation("CreatedStudyModules", fields: [createdBy], references: [id])
+  
+  // Relations
+  lessons       StudyLesson[]
+  assignments   StudyModuleAssignment[]
+  progress      StudyProgress[]
+  
+  // Gamification
+  xpReward      Int      @default(100)
+  badgeType     String?  // Type of badge awarded on completion
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  @@index([createdBy])
+  @@index([subject, gradeLevel])
+  @@map("study_modules")
+}
+
+model StudyLesson {
+  id            String   @id @default(cuid())
+  moduleId      String
+  module        StudyModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  
+  lessonNumber  Int
+  title         String
+  
+  // Lesson Content (AI Generated)
+  content       Json     // Theory, examples, explanations
+  
+  // Steps in the lesson
+  steps         StudyStep[]
+  completedSteps CompletedStep[]
+  
+  // Requirements
+  minScore      Int      @default(80) // Minimum score to pass
+  maxAttempts   Int      @default(3)
+  
+  // Rewards
+  xpReward      Int      @default(10)
+  
+  order         Int
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  @@unique([moduleId, lessonNumber])
+  @@index([moduleId])
+  @@map("study_lessons")
+}
+
+model StudyStep {
+  id            String   @id @default(cuid())
+  lessonId      String
+  lesson        StudyLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  stepNumber    Int
+  type          StepType // THEORY, PRACTICE, QUIZ, CHALLENGE
+  title         String
+  
+  // Content
+  content       Json     // Questions, explanations, interactive elements
+  
+  // Requirements
+  passingScore  Int      @default(80)
+  timeLimit     Int?     // Optional time limit in seconds
+  
+  // Student Progress
+  attempts      StudentStepProgress[]
+  
+  order         Int
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  @@unique([lessonId, stepNumber])
+  @@index([lessonId])
+  @@map("study_steps")
+}
+
+enum StepType {
+  THEORY
+  PRACTICE_EASY
+  PRACTICE_MEDIUM
+  PRACTICE_HARD
+  QUIZ
+  CHALLENGE
+  REVIEW
+}
+
+model StudyModuleAssignment {
+  id            String   @id @default(cuid())
+
+  moduleId      String
+  module        StudyModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  studentId     String
+  student       User     @relation("StudentStudyAssignments", fields: [studentId], references: [id])
+
+  assignedBy    String
+  assignedByUser User    @relation("StudyAssignmentCreator", fields: [assignedBy], references: [id])
+
+  // Assignment settings
+  dueDate       DateTime?
+  instructions  String?   @db.Text
+
+  // Progress
+  currentLesson Int      @default(1)
+  currentStep   Int      @default(1)
+  overallProgress Float  @default(0) // 0-100%
+
+  // Gamification
+  totalXp       Int      @default(0)
+  lives         Int      @default(3)
+  streak        Int      @default(0)
+  lastActiveAt  DateTime?
+
+  // Status
+  status        ModuleStatus @default(IN_PROGRESS)
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  // Performance
+  averageScore  Float    @default(0)
+  totalAttempts Int      @default(0)
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([moduleId, studentId])
+  @@index([studentId])
+  @@index([assignedBy])
+  @@map("study_module_assignments")
+}
+
+enum ModuleStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  PAUSED
+}
+
+model StudyProgress {
+  id            String   @id @default(cuid())
+  
+  moduleId      String
+  module        StudyModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  
+  studentId     String
+  student       User     @relation("StudentProgress", fields: [studentId], references: [id])
+  
+  // Current position
+  currentLessonNumber Int @default(1)
+  currentStepNumber   Int @default(1)
+  
+  // Gamification
+  totalXP       Int      @default(0)
+  livesRemaining Int     @default(3)
+  streak        Int      @default(0)
+  
+  // Tracking
+  lastAccessedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  completedSteps CompletedStep[]
+  
+  @@unique([moduleId, studentId])
+  @@index([studentId])
+  @@map("study_progress")
+}
+
+model CompletedStep {
+  id            String   @id @default(cuid())
+  
+  progressId    String
+  progress      StudyProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  
+  lessonId      String
+  lesson        StudyLesson @relation(fields: [lessonId], references: [id])
+  
+  stepNumber    Int
+  completedAt   DateTime @default(now())
+  score         Float
+  timeSpent     Int      // In seconds
+  
+  @@unique([progressId, lessonId, stepNumber])
+  @@map("completed_steps")
+}
+
+model StudentStepProgress {
+  id            String   @id @default(cuid())
+  
+  stepId        String
+  step          StudyStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  
+  studentId     String
+  student       User     @relation("StudentStepProgress", fields: [studentId], references: [id])
+  
+  // Attempt details
+  attemptNumber Int
+  score         Float
+  answers       Json     // Student's answers
+  timeSpent     Int      // In seconds
+  
+  // Status
+  passed        Boolean
+  
+  completedAt   DateTime @default(now())
+  
+  @@index([stepId])
+  @@index([studentId])
+  @@map("student_step_progress")
 }

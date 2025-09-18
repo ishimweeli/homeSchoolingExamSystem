@@ -458,6 +458,68 @@ export default function TakeExamPage() {
                         </p>
                       </div>
                     )}
+
+                    {currentQuestion.type === 'FILL_BLANKS' && (() => {
+                      // Parse the question to find blanks (marked with _____ or parentheses)
+                      const questionText = currentQuestion.question;
+                      const blankPattern = /(_+|\([^)]*\))/g;
+                      const questionParts = questionText.split(blankPattern);
+                      const blanks = questionText.match(blankPattern) || [];
+                      const blankCount = blanks.length;
+                      
+                      // Get or initialize answers array
+                      let currentAnswers = [];
+                      try {
+                        if (answers[currentQuestion.id]) {
+                          currentAnswers = typeof answers[currentQuestion.id] === 'string' ? 
+                            JSON.parse(answers[currentQuestion.id]) : answers[currentQuestion.id];
+                        }
+                      } catch (e) {
+                        currentAnswers = [];
+                      }
+                      if (!Array.isArray(currentAnswers)) {
+                        currentAnswers = [];
+                      }
+                      while (currentAnswers.length < blankCount) {
+                        currentAnswers.push('');
+                      }
+                      
+                      let blankIndex = 0;
+                      
+                      return (
+                        <div className="space-y-4">
+                          <Label className="text-sm font-medium text-gray-700">Fill in the blanks:</Label>
+                          <div className="bg-gray-50 rounded-xl p-6 border-2 border-gray-200">
+                            <div className="text-lg leading-relaxed flex flex-wrap items-baseline gap-1">
+                              {questionParts.map((part, index) => {
+                                if (part.match(blankPattern)) {
+                                  const currentBlankIndex = blankIndex++;
+                                  return (
+                                    <Input
+                                      key={`blank-${currentBlankIndex}`}
+                                      type="text"
+                                      value={currentAnswers[currentBlankIndex] || ''}
+                                      onChange={(e) => {
+                                        const newAnswers = [...currentAnswers];
+                                        newAnswers[currentBlankIndex] = e.target.value;
+                                        handleAnswerChange(currentQuestion.id, JSON.stringify(newAnswers));
+                                      }}
+                                      placeholder="type answer"
+                                      className="inline-flex mx-1 px-3 py-1 border-2 border-blue-300 rounded-md focus:border-blue-500 text-center font-medium bg-white"
+                                      style={{ width: '150px', verticalAlign: 'baseline' }}
+                                    />
+                                  );
+                                }
+                                return <span key={`text-${index}`}>{part}</span>;
+                              })}
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            Enter your answers in the blanks above ({blankCount} blank{blankCount !== 1 ? 's' : ''} to fill)
+                          </p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 

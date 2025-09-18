@@ -146,6 +146,35 @@ export class AIService {
     }
   }
 
+  async generateLessonPlan(prompt: string): Promise<string> {
+    try {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert homeschool curriculum designer. Create comprehensive, engaging lesson plans that are practical for parents to implement with minimal preparation.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000,
+        response_format: { type: 'json_object' }
+      })
+
+      const content = response.choices[0].message.content
+      if (!content) throw new Error('No lesson plan generated')
+
+      return content
+    } catch (error) {
+      console.error('AI Lesson Plan Generation Error:', error)
+      throw new Error('Failed to generate lesson plan')
+    }
+  }
+
   async generateStudyRecommendations(
     studentId: string,
     recentPerformance: any[]

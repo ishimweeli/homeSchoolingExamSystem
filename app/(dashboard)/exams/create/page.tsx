@@ -279,6 +279,28 @@ export default function CreateExamPage() {
             )}
           </div>
 
+          {/* Result Publishing Settings */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                {...register('autoPublishResults')}
+                id="autoPublish"
+                className="mt-1"
+                defaultChecked={true}
+              />
+              <div className="flex-1">
+                <label htmlFor="autoPublish" className="font-medium text-gray-900 cursor-pointer">
+                  Auto-publish results to students
+                </label>
+                <p className="text-sm text-gray-600 mt-1">
+                  When enabled, students will see their results immediately after submission. 
+                  When disabled, you'll need to manually review and publish results.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Question Types */}
           <div>
             <label className="block text-sm font-medium mb-3">

@@ -32,7 +32,6 @@ import {
   Microscope,
   MapPin,
   Trophy,
-  Certificate,
   User
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -83,7 +82,7 @@ const PORTFOLIO_ITEM_TYPES = {
   FIELD_TRIP: { label: 'Field Trip', icon: MapPin },
   REFLECTION: { label: 'Reflection', icon: FileText },
   ACHIEVEMENT: { label: 'Achievement', icon: Trophy },
-  CERTIFICATE: { label: 'Certificate', icon: Certificate },
+  CERTIFICATE: { label: 'Certificate', icon: Award },
 };
 
 export default function PortfoliosPage() {

@@ -6,15 +6,20 @@ const prisma = new PrismaClient()
 async function main() {
   console.log('Starting seed...')
 
-  // Create test users
-  const hashedPassword = await bcrypt.hash('password123', 12)
+  // Create test users with consistent hash (cost 10 for faster testing)
+  const hashedPassword = await bcrypt.hash('password123', 10)
 
   // Create admin user
   const admin = await prisma.user.upsert({
     where: { email: 'admin@test.com' },
-    update: {},
+    update: {
+      password: hashedPassword,
+      username: 'admin_test',
+      isActive: true,
+    },
     create: {
       email: 'admin@test.com',
+      username: 'admin_test',
       password: hashedPassword,
       name: 'Admin User',
       role: 'ADMIN',
@@ -25,9 +30,14 @@ async function main() {
   // Create teacher/parent user
   const teacher = await prisma.user.upsert({
     where: { email: 'teacher@test.com' },
-    update: {},
+    update: {
+      password: hashedPassword,
+      username: 'teacher_test',
+      isActive: true,
+    },
     create: {
       email: 'teacher@test.com',
+      username: 'teacher_test',
       password: hashedPassword,
       name: 'Teacher User',
       role: 'TEACHER',
@@ -38,9 +48,14 @@ async function main() {
   // Create parent user
   const parent = await prisma.user.upsert({
     where: { email: 'parent@test.com' },
-    update: {},
+    update: {
+      password: hashedPassword,
+      username: 'parent_test',
+      isActive: true,
+    },
     create: {
       email: 'parent@test.com',
+      username: 'parent_test',
       password: hashedPassword,
       name: 'Parent User',
       role: 'PARENT',
@@ -51,13 +66,21 @@ async function main() {
   // Create student user
   const student = await prisma.user.upsert({
     where: { email: 'student@test.com' },
-    update: {},
+    update: {
+      password: hashedPassword,
+      username: 'student_test',
+      isActive: true,
+      parentId: parent.id,
+      createdById: teacher.id,
+    },
     create: {
       email: 'student@test.com',
+      username: 'student_test',
       password: hashedPassword,
       name: 'Student User',
       role: 'STUDENT',
       parentId: parent.id,
+      createdById: teacher.id, // Student created by teacher for auto-assignment
       isActive: true,
     },
   })

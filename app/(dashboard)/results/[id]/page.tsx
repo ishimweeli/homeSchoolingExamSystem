@@ -91,7 +91,12 @@ export default function DetailedResultPage() {
       const response = await fetch(`/api/results/${attemptId}`);
       if (response.ok) {
         const data = await response.json();
-        setResult(data);
+        // Check if results are pending review
+        if (data.status === 'pending_review') {
+          setResult(null);
+        } else {
+          setResult(data);
+        }
       }
     } catch (error) {
       console.error('Error fetching detailed result:', error);
@@ -163,9 +168,31 @@ export default function DetailedResultPage() {
   if (!result) {
     return (
       <div className="container mx-auto p-6">
-        <Card>
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader className="text-center">
+            <div className="mx-auto bg-yellow-100 p-4 rounded-full w-16 h-16 flex items-center justify-center mb-4">
+              <Clock className="h-8 w-8 text-yellow-600" />
+            </div>
+            <CardTitle>Results Pending Review</CardTitle>
+            <CardDescription className="mt-2 text-base">
+              Your exam has been submitted successfully!
+            </CardDescription>
+          </CardHeader>
           <CardContent className="p-6">
-            <p className="text-center text-muted-foreground">Result not found</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800">
+                Your teacher needs to review and publish the results before they become available. 
+                This usually takes 1-2 days. You'll be notified once your results are ready.
+              </p>
+            </div>
+            <div className="text-center space-y-3">
+              <p className="text-muted-foreground">
+                Exam submitted at: {new Date().toLocaleString()}
+              </p>
+              <Button onClick={() => router.push('/dashboard')} className="mt-4">
+                Go to Dashboard
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -206,6 +233,14 @@ export default function DetailedResultPage() {
             )}
           </div>
           <div className="flex gap-2">
+            {session?.user?.role !== 'STUDENT' && result.status !== 'graded' && (
+              <Button 
+                onClick={() => router.push(`/results/${result.id}/grade`)}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Grade Exam
+              </Button>
+            )}
             <Button variant="outline" size="icon" onClick={handlePrint}>
               <Printer className="h-4 w-4" />
             </Button>

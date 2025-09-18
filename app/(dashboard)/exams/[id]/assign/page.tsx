@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Users, User, ArrowLeft, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/loading-skeleton';
 
 interface Student {
   id: string;
@@ -255,15 +256,7 @@ export default function AssignExamPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!exam) {
+  if (!exam && !loading) {
     return (
       <div className="container mx-auto p-6">
         <Card>
@@ -296,7 +289,13 @@ export default function AssignExamPage() {
         
         <h1 className="text-3xl font-bold">Assign Exam</h1>
         <p className="text-muted-foreground mt-2">
-          {exam.title} - {exam.subject} (Grade {exam.gradeLevel})
+          {loading ? (
+            <Skeleton className="h-4 w-64" />
+          ) : exam ? (
+            `${exam.title} - ${exam.subject} (Grade ${exam.gradeLevel})`
+          ) : (
+            'Loading exam details...'
+          )}
         </p>
       </div>
 
@@ -462,7 +461,16 @@ export default function AssignExamPage() {
                 </div>
                 
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {students.length === 0 ? (
+                  {loading ? (
+                    <>
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="flex items-center space-x-2 p-2">
+                          <Skeleton className="h-4 w-4" />
+                          <Skeleton className="h-4 flex-1" />
+                        </div>
+                      ))}
+                    </>
+                  ) : students.length === 0 ? (
                     <p className="text-center text-muted-foreground py-4">
                       No students available. Create a student to get started.
                     </p>
@@ -549,7 +557,19 @@ export default function AssignExamPage() {
                 </div>
                 
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {classes.length === 0 ? (
+                  {loading ? (
+                    <>
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="flex items-center space-x-2 p-2">
+                          <Skeleton className="h-4 w-4" />
+                          <div className="flex-1">
+                            <Skeleton className="h-4 w-32 mb-1" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  ) : classes.length === 0 ? (
                     <p className="text-center text-muted-foreground py-4">
                       No classes available. Create a class to group your students.
                     </p>

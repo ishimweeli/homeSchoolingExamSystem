@@ -50,10 +50,20 @@ export async function GET(
 
     // Check access permissions
     const userRole = session.user.role;
+    
+    // Check if results are not published yet for students/parents
+    if ((userRole === 'STUDENT' || userRole === 'PARENT') && !grade.isPublished) {
+      return NextResponse.json({ 
+        error: 'Results not published',
+        message: 'Your exam has been submitted successfully. Results will be available once your teacher reviews and publishes them.',
+        status: 'pending_review'
+      }, { status: 200 });
+    }
+    
     const hasAccess = 
       userRole === 'ADMIN' ||
-      (userRole === 'STUDENT' && grade.studentId === session.user.id && grade.isPublished) ||
-      (userRole === 'PARENT' && grade.student.parentId === session.user.id && grade.isPublished) ||
+      (userRole === 'STUDENT' && grade.studentId === session.user.id) ||
+      (userRole === 'PARENT' && grade.student.parentId === session.user.id) ||
       (userRole === 'TEACHER' && (
         grade.attempt.exam.creatorId === session.user.id ||
         await prisma.class.findFirst({

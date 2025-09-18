@@ -22,6 +22,7 @@ import {
   FolderOpen,
   MessageSquare,
   TrendingUp,
+  Sparkles,
 } from 'lucide-react'
 
 interface NavItem {
@@ -61,35 +62,25 @@ const navItems: NavItem[] = [
     icon: Award,
   },
   {
-    label: 'Portfolio',
-    href: '/portfolios',
-    icon: FolderOpen,
+    label: 'Study Modules',
+    href: '/study',
+    icon: Sparkles,
   },
   {
-    label: 'Community',
-    href: '/community',
-    icon: MessageSquare,
-  },
-  {
-    label: 'Analytics',
-    href: '/analytics',
-    icon: BarChart,
-    roles: ['PARENT', 'TEACHER', 'ADMIN'],
-  },
-  {
-    label: 'Progress Reports',
-    href: '/reports',
+    label: 'Student Progress',
+    href: '/study/progress',
     icon: TrendingUp,
-    roles: ['PARENT', 'TEACHER', 'ADMIN'],
-  },
-  {
-    label: 'Study Materials',
-    href: '/materials',
-    icon: BookOpen,
+    roles: ['TEACHER', 'PARENT', 'ADMIN'],
   },
   {
     label: 'Classes',
     href: '/classes',
+    icon: Users,
+    roles: ['PARENT', 'TEACHER', 'ADMIN'],
+  },
+  {
+    label: 'Students',
+    href: '/students',
     icon: Users,
     roles: ['PARENT', 'TEACHER', 'ADMIN'],
   },
@@ -99,17 +90,45 @@ const navItems: NavItem[] = [
     icon: Users,
     roles: ['PARENT'],
   },
-  {
-    label: 'Admin Panel',
-    href: '/admin',
-    icon: Shield,
-    roles: ['ADMIN'],
-  },
-  {
-    label: 'Settings',
-    href: '/settings',
-    icon: Settings,
-  },
+  // Hidden for now - will be added back later
+  // {
+  //   label: 'Portfolio',
+  //   href: '/portfolios',
+  //   icon: FolderOpen,
+  // },
+  // {
+  //   label: 'Community',
+  //   href: '/community',
+  //   icon: MessageSquare,
+  // },
+  // {
+  //   label: 'Analytics',
+  //   href: '/analytics',
+  //   icon: BarChart,
+  //   roles: ['PARENT', 'TEACHER', 'ADMIN'],
+  // },
+  // {
+  //   label: 'Progress Reports',
+  //   href: '/reports',
+  //   icon: TrendingUp,
+  //   roles: ['PARENT', 'TEACHER', 'ADMIN'],
+  // },
+  // {
+  //   label: 'Study Materials',
+  //   href: '/materials',
+  //   icon: BookOpen,
+  // },
+  // {
+  //   label: 'Admin Panel',
+  //   href: '/admin',
+  //   icon: Shield,
+  //   roles: ['ADMIN'],
+  // },
+  // {
+  //   label: 'Settings',
+  //   href: '/settings',
+  //   icon: Settings,
+  // },
 ]
 
 export default function Sidebar() {

@@ -21,7 +21,21 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(del nul)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "WebFetch(domain:www.khanmigo.ai)",
+      "WebFetch(domain:trekai.org)",
+      "WebFetch(domain:teachwithaimie.io)",
+      "mcp__ide__executeCode",
+      "Bash(tasklist)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(timeout:*)",
+      "Bash(curl:*)",
+      "Bash(powershell:*)",
+      "Bash(npx tsx:*)",
+      "Bash(docker:*)",
+      "Bash(winget install:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

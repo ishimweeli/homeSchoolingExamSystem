@@ -284,6 +284,9 @@ export async function POST(
     }
 
     // Create grade record with AI grading
+    // Check if results should be auto-published
+    const isPublished = attempt.exam.autoPublishResults ?? true;
+    
     const grade = await prisma.grade.create({
       data: {
         attemptId: finalAttemptId,
@@ -293,7 +296,9 @@ export async function POST(
         grade: gradeLetter,
         status: openai ? 'COMPLETED' : 'PENDING',
         aiAnalysis,
-        overallFeedback: aiAnalysis?.feedback || null
+        overallFeedback: aiAnalysis?.feedback || null,
+        isPublished,
+        publishedAt: isPublished ? new Date() : null
       }
     });
 

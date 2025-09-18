@@ -1,0 +1,133 @@
+name: Deploy Home Schooling App
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t homeschooling-app:latest .
+          docker save homeschooling-app:latest | gzip > homeschooling-app.tar.gz
+
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Copy Docker image to server
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSPHRASE }}
+        run: |
+          echo "Copying Docker image to server..."
+          sshpass -e scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no homeschooling-app.tar.gz ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/tmp/
+
+      - name: Deploy to server
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSPHRASE }}
+        run: |
+          sshpass -e ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOFMARKER'
+          # Load the Docker image
+          echo "Loading Docker image..."
+          docker load < /tmp/homeschooling-app.tar.gz
+
+          # Create app directory if it doesn't exist
+          mkdir -p /opt/homeschooling-app
+
+          # Navigate to app directory
+          cd /opt/homeschooling-app
+
+          # Create environment file
+          cat > .env << 'ENVEOF'
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          ENVEOF
+
+          # Stop and remove existing container if it exists
+          if [ "$(docker ps -a -q -f name=homeschooling-container)" ]; then
+            echo "Stopping existing container..."
+            docker stop homeschooling-container
+            docker rm homeschooling-container
+          fi
+
+          # Run new container with environment variables
+          echo "Starting new container..."
+          docker run -d --name homeschooling-container \
+            -p 3001:3001 \
+            --env-file .env \
+            --restart unless-stopped \
+            homeschooling-app:latest
+
+          # Wait for container to start
+          sleep 5
+
+          # Check if container is running
+          if [ "$(docker ps -q -f name=homeschooling-container)" ]; then
+            echo "Container started successfully!"
+            docker ps | grep homeschooling-container
+          else
+            echo "Container failed to start. Checking logs..."
+            docker logs homeschooling-container
+            exit 1
+          fi
+
+          # Clean up old images and temporary files
+          docker image prune -f
+          rm -f /tmp/homeschooling-app.tar.gz
+
+          echo "Deployment completed successfully!"
+          echo "App is running at: http://${{ secrets.SERVER_IP }}:3001"
+
+          # Force exit to close SSH session
+          exit 0
+          EOFMARKER
+
+      - name: Verify deployment
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSPHRASE }}
+        run: |
+          sleep 10
+          sshpass -e ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOFMARKER'
+          echo "Checking container status..."
+          docker ps | grep homeschooling-container
+          echo "Checking container logs (last 20 lines)..."
+          docker logs --tail 20 homeschooling-container
+          exit 0
+          EOFMARKER

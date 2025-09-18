@@ -164,7 +164,7 @@ export default function CommunityPage() {
 
   const getAuthorInitials = (author: any) => {
     const name = getAuthorDisplayName(author);
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   const filteredPosts = posts.filter(post => {
