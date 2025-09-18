@@ -23,7 +23,7 @@ import {
   Download,
   Filter,
   CheckCircle2,
-  XCircle2,
+  XCircle,
   Send
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -196,8 +196,8 @@ export default function ResultsPage() {
     );
   }
 
-  const uniqueSubjects = [...new Set(results.map(r => r.exam.subject))];
-  const uniqueGrades = [...new Set(results.map(r => r.grade).filter(Boolean))];
+  const uniqueSubjects = Array.from(new Set(results.map(r => r.exam.subject)));
+  const uniqueGrades = Array.from(new Set(results.map(r => r.grade).filter(Boolean)));
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">

@@ -42,7 +42,6 @@ export default function MaterialsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full"
-            icon={<Search className="h-4 w-4" />}
           />
         </div>
         {session?.user?.role !== 'STUDENT' && (

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { 
   CheckCircle, 
   XCircle, 
@@ -117,8 +118,8 @@ export default function GradeExamPage() {
         }
         // If multiple blanks
         if (Array.isArray(studentAnswer) && Array.isArray(question.correctAnswer)) {
-          return studentAnswer.every((ans, idx) => 
-            ans.toLowerCase().trim() === question.correctAnswer[idx]?.toLowerCase().trim()
+          return studentAnswer.every((ans, idx) =>
+            ans.toLowerCase().trim() === (question.correctAnswer as string[])[idx]?.toLowerCase().trim()
           );
         }
         return false;

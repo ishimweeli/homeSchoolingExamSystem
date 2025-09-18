@@ -78,8 +78,8 @@ export default function StudyPage() {
   const calculateProgress = (module: StudyModule) => {
     if (!module.progress) return 0;
     // Use the overallProgress if available
-    if (module.progress.overallProgress !== undefined) {
-      return module.progress.overallProgress;
+    if ((module.progress as any).overallProgress !== undefined) {
+      return (module.progress as any).overallProgress;
     }
     // Otherwise calculate based on current lesson/step
     const currentLesson = module.progress.currentLessonNumber || 1;
@@ -201,33 +201,33 @@ export default function StudyPage() {
                 
                 <CardContent>
                   {/* Assignment Stats for Teachers */}
-                  {isTeacherOrParent && module.assignments && module.assignments.length > 0 && (
+                  {isTeacherOrParent && (module as any).assignments && (module as any).assignments.length > 0 && (
                     <div className="space-y-2 mb-4 p-3 bg-blue-50 rounded-lg">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-blue-700 font-medium">
-                          {module.assignments.length} Students Assigned
+                          {(module as any).assignments.length} Students Assigned
                         </span>
                         <span className="text-blue-600">
                           Avg Progress: {Math.round(
-                            module.assignments.reduce((sum: number, a: any) =>
-                              sum + (a.overallProgress || 0), 0) / module.assignments.length
+                            (module as any).assignments.reduce((sum: number, a: any) =>
+                              sum + (a.overallProgress || 0), 0) / (module as any).assignments.length
                           )}%
                         </span>
                       </div>
                       <Progress
-                        value={module.assignments.reduce((sum: number, a: any) =>
-                          sum + (a.overallProgress || 0), 0) / module.assignments.length}
+                        value={(module as any).assignments.reduce((sum: number, a: any) =>
+                          sum + (a.overallProgress || 0), 0) / (module as any).assignments.length}
                         className="h-2 bg-blue-100"
                       />
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {module.assignments.slice(0, 3).map((assignment: any) => (
+                        {(module as any).assignments.slice(0, 3).map((assignment: any) => (
                           <Badge key={assignment.id} variant="outline" className="text-xs">
                             {assignment.student?.name}: {assignment.overallProgress || 0}%
                           </Badge>
                         ))}
-                        {module.assignments.length > 3 && (
+                        {(module as any).assignments.length > 3 && (
                           <Badge variant="outline" className="text-xs">
-                            +{module.assignments.length - 3} more
+                            +{(module as any).assignments.length - 3} more
                           </Badge>
                         )}
                       </div>

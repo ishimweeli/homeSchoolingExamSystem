@@ -284,7 +284,6 @@ export default function CreateExamPage() {
             <div className="flex items-start gap-3">
               <input
                 type="checkbox"
-                {...register('autoPublishResults')}
                 id="autoPublish"
                 className="mt-1"
                 defaultChecked={true}

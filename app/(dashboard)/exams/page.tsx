@@ -78,18 +78,7 @@ export default function ExamsListPage() {
           }
           throw new Error('Failed to publish')
         },
-        error: async (err) => {
-          try {
-            const response = await err
-            if (response && response.json) {
-              const errorData = await response.json()
-              return errorData.error || 'Failed to publish exam'
-            }
-          } catch {
-            // If we can't parse the error, use default message
-          }
-          return 'Failed to publish exam'
-        },
+        error: 'Failed to publish exam',
       }
     )
   }

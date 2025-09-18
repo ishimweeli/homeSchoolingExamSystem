@@ -126,13 +126,13 @@ export async function POST(request: NextRequest) {
           create: generatedQuestions.map((question, index) => ({
             type: question.type,
             question: question.question,
-            options: question.options || null,
+            options: question.options as any,
             correctAnswer: question.correctAnswer,
             marks: question.marks,
             aiGenerated: true,
             difficulty: question.difficulty,
             topic: question.topic,
-            gradingRubric: question.gradingRubric || null,
+            gradingRubric: question.gradingRubric as any,
             sampleAnswer: question.sampleAnswer || null,
             order: index,
           })),
@@ -257,14 +257,14 @@ function analyzeStudentPerformance(performanceData: any, recentAttempts: any[]) 
     analysis.weaknesses = []
     analysis.preferredQuestionTypes = []
 
-    for (const [type, data] of questionAnalysis) {
+    for (const [type, data] of Array.from(questionAnalysis.entries())) {
       const accuracy = data.correct / data.total
       if (accuracy >= 0.8 && data.total >= 3) {
         analysis.preferredQuestionTypes.push(type)
       }
     }
 
-    for (const [topic, data] of topicAnalysis) {
+    for (const [topic, data] of Array.from(topicAnalysis.entries())) {
       const accuracy = data.correct / data.total
       if (accuracy >= 0.8 && data.total >= 2) {
         analysis.strengths.push(topic)
@@ -276,19 +276,19 @@ function analyzeStudentPerformance(performanceData: any, recentAttempts: any[]) 
 
     // Determine recommended difficulty
     if (analysis.averageScore >= 85) {
-      analysis.recommendedDifficulty = 'hard'
+      analysis.recommendedDifficulty = 'hard' as any
     } else if (analysis.averageScore >= 70) {
       analysis.recommendedDifficulty = 'medium'
     } else {
-      analysis.recommendedDifficulty = 'easy'
+      analysis.recommendedDifficulty = 'easy' as any
     }
 
     // Calculate trending
     if (scores.length >= 3) {
       const recent = scores.slice(0, 2).reduce((a, b) => a + b) / 2
       const older = scores.slice(-2).reduce((a, b) => a + b) / 2
-      if (recent > older + 10) analysis.trending = 'IMPROVING'
-      else if (recent < older - 10) analysis.trending = 'DECLINING'
+      if (recent > older + 10) analysis.trending = 'IMPROVING' as any
+      else if (recent < older - 10) analysis.trending = 'DECLINING' as any
     }
   }
 

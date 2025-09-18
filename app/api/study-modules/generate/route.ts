@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
     `;
 
     // AI Generation with retry logic
-    let generatedContent;
+    let generatedContent: any;
     let aiSuccess = false;
     
     while (attempts < maxAttempts && !aiSuccess) {
@@ -162,7 +162,6 @@ export async function POST(req: NextRequest) {
           ],
           temperature: 0.7,
           max_tokens: 4000,
-          timeout: 90000, // 90 second timeout per attempt
           response_format: { type: 'json_object' }
         });
 

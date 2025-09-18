@@ -219,11 +219,11 @@ export async function GET(
       student: grade.student,
       answers: grade.attempt.answers,
       score: grade.totalScore,
-      maxScore: grade.maxScore,
+      maxScore: (grade as any).maxScore || 100,
       status: grade.status,
-      feedback: grade.feedback,
+      feedback: (grade as any).feedback || null,
       submittedAt: grade.attempt.submittedAt,
-      gradedAt: grade.createdAt,
+      gradedAt: (grade as any).createdAt || new Date(),
     };
 
     if (!result) {
@@ -265,7 +265,7 @@ export async function GET(
       studentId: result.studentId,
       studentName: result.student.firstName && result.student.lastName
         ? `${result.student.firstName} ${result.student.lastName}`
-        : result.student.name || result.student.username || 'Unknown Student',
+        : result.student.name || (result.student as any).username || 'Unknown Student',
       questions: result.exam.questions.map(q => ({
         id: q.id,
         question: q.question,
@@ -275,12 +275,15 @@ export async function GET(
         points: q.marks || 1,
         explanation: q.sampleAnswer || null,
       })),
-      answers: result.answers.map(answer => ({
-        questionId: answer.questionId,
-        answer: answer.answer,
-        isCorrect: answer.finalScore === q.marks,
-        points: answer.finalScore || 0,
-      })),
+      answers: result.answers.map(answer => {
+        const question = result.exam.questions.find(q => q.id === answer.questionId);
+        return {
+          questionId: answer.questionId,
+          answer: answer.answer,
+          isCorrect: answer.finalScore === (question?.marks || 0),
+          points: answer.finalScore || 0,
+        };
+      }),
       totalScore: result.score || 0,
       maxScore: result.maxScore,
       status: result.status,

@@ -106,7 +106,7 @@ export default function ExamDetailPage({ params }: PageProps) {
         <h2 className="text-lg font-semibold mb-4">Questions ({exam.questions.length})</h2>
         
         <div className="space-y-6">
-          {exam.questions.map((question, index) => (
+          {exam.questions.map((question: any, index: number) => (
             <div key={question.id} className="border-b last:border-0 pb-6 last:pb-0">
               <div className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
@@ -207,17 +207,8 @@ function PublishExamButton({ examId }: { examId: string }) {
           }
           throw new Error('Failed to publish')
         },
-        error: async (err) => {
+        error: (err) => {
           setPublishing(false)
-          try {
-            const response = await err
-            if (response && response.json) {
-              const errorData = await response.json()
-              return errorData.error || 'Failed to publish exam'
-            }
-          } catch {
-            // If we can't parse the error, use default message
-          }
           return 'Failed to publish exam'
         },
       }

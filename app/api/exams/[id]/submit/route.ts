@@ -295,7 +295,7 @@ export async function POST(
         percentage,
         grade: gradeLetter,
         status: openai ? 'COMPLETED' : 'PENDING',
-        aiAnalysis,
+        aiAnalysis: aiAnalysis as any,
         overallFeedback: aiAnalysis?.feedback || null,
         isPublished,
         publishedAt: isPublished ? new Date() : null

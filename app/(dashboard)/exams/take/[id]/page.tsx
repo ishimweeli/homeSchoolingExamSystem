@@ -211,7 +211,7 @@ export default function TakeExamPage() {
                     <Badge variant="outline" className="font-normal">
                       {exam.subject}
                     </Badge>
-                    <span className="text-sm text-gray-500">Grade {exam.gradeLevel}</span>
+                    <span className="text-sm text-gray-500">Grade {(exam as any).gradeLevel}</span>
                     {exam.description && (
                       <span className="text-sm text-gray-500">• {exam.description}</span>
                     )}

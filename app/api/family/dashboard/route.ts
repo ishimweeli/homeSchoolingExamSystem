@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
           examsCompleted: recentAttempts.length,
           averageScore: Math.round(averageScore * 10) / 10,
           timeSpent: totalStudyTime,
-          lastActivity: lastActivity ? formatRelativeTime(lastActivity) : 'No recent activity'
+          lastActivity: lastActivity ? formatRelativeTime(lastActivity.toISOString()) : 'No recent activity'
         },
         currentAssignments: child.assignedExams.length,
         upcomingDeadlines
