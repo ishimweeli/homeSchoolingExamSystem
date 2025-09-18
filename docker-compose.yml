@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Next.js Application (using Neon database from .env.local)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env.local  # Use your existing local environment file
+    environment:
+      - NODE_ENV=production
+      # Override NEXTAUTH_URL for Docker container access
+      - NEXTAUTH_URL=http://localhost:3001
+    networks:
+      - app-network
+    volumes:
+      - ./uploads:/app/uploads
+      - ./.env.local:/app/.env.local:ro  # Mount env file as read-only
+    command: >
+      sh -c "
+        npx prisma db push &&
+        npx prisma db seed &&
+        node server.js
+      "
+
+  # Redis (Optional - for session storage and caching)
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    command: redis-server --appendonly yes
+
+volumes:
+  redis_data:
+
+networks:
+  app-network:
+    driver: bridge

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -15,7 +15,14 @@
     "browser:screenshot": "node mcp-browser-server.js screenshot",
     "test:e2e": "npx -p puppeteer node e2e-complete-flow.js",
     "test:teacher-login": "npx -p puppeteer node test-teacher-login.js",
-    "test:student-login": "npx -p puppeteer node test-student-login.js"
+    "test:student-login": "npx -p puppeteer node test-student-login.js",
+    "docker:build": "docker build -t homeschooling-exam-system .",
+    "docker:run": "docker run -p 3001:3001 homeschooling-exam-system",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:restart": "docker-compose restart",
+    "docker:rebuild": "docker-compose down && docker-compose build --no-cache && docker-compose up -d"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -34,6 +41,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@tanstack/react-query": "^5.51.11",
+    "@uploadthing/react": "^7.3.3",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -51,6 +59,7 @@
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7",
+    "uploadthing": "^7.7.4",
     "zod": "^3.23.8",
     "zustand": "^4.5.4"
   },
@@ -62,11 +71,15 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.5",
+    "node-fetch": "^2.7.0",
     "postcss": "^8.4.41",
     "prisma": "^5.18.0",
     "puppeteer": "^24.20.0",
     "tailwindcss": "^3.4.10",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }
