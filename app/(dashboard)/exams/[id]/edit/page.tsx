@@ -95,18 +95,7 @@ export default function ExamEditPage({ params }: PageProps) {
           }
           throw new Error('Failed to save')
         },
-        error: async (err) => {
-          try {
-            const response = await err
-            if (response && response.json) {
-              const errorData = await response.json()
-              return errorData.error || 'Failed to save exam'
-            }
-          } catch {
-            // If we can't parse the error, use default message
-          }
-          return 'Failed to save exam'
-        },
+        error: 'Failed to save exam',
       }
     ).finally(() => {
       setSaving(false)
