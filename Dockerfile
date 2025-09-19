@@ -31,7 +31,10 @@ ENV NEXT_TELEMETRY_DISABLED 1
 # Set dummy environment variables for build time
 # These are needed for Next.js to build but will be overridden at runtime
 ENV NEXTAUTH_URL=http://localhost:3000
-ENV NEXTAUTH_SECRET=build-time-secret-only
+ENV NEXTAUTH_SECRET=build-time-secret-only-replace-in-production
+ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
+ENV OPENAI_API_KEY=dummy-key-for-build
+ENV NODE_ENV=production
 
 RUN npm run build
 

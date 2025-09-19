@@ -11,7 +11,6 @@ import { toast } from 'sonner'
 
 import { Loader2, GraduationCap } from 'lucide-react'
 
-export const dynamic = 'force-dynamic'
 
 const loginSchema = z.object({
   emailOrUsername: z.string().min(1, 'Email or username is required'),
