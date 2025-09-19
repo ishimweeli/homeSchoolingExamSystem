@@ -32,14 +32,19 @@ RUN npx prisma generate
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Set hardcoded environment variables for build time
-ENV DATABASE_URL="postgresql://postgres:password123@localhost:5432/homeschooling_exam_db"
-ENV NEXTAUTH_SECRET="hardcoded-secret-change-in-production-later"
-ENV NEXTAUTH_URL="http://localhost:3001"
-ENV OPENAI_API_KEY="sk-hardcoded-openai-key-change-later"
+# Set environment variables for build time - using your production database
+ENV DATABASE_URL="postgresql://neondb_owner:npg_wPT5x7MgmZVv@ep-raspy-dew-a85w6sl0-pooler.eastus2.azure.neon.tech/neondb?sslmode=require"
+ENV NEXTAUTH_SECRET="your-secret-key-here-change-in-production"
+ENV NEXTAUTH_URL="http://127.0.0.1:3001"
+ENV OPENAI_API_KEY="dummy-openai-key-for-build-only"
 ENV NODE_ENV="production"
-ENV UPLOADTHING_SECRET="hardcoded-uploadthing-secret"
-ENV UPLOADTHING_APP_ID="hardcoded-uploadthing-app-id"
+ENV UPLOADTHING_SECRET="sk_live_your-secret-key-here"
+ENV UPLOADTHING_APP_ID="your-app-id-here"
+ENV SMTP_HOST="smtp.gmail.com"
+ENV SMTP_PORT="587"
+ENV SMTP_USER="your-email@gmail.com"
+ENV SMTP_PASS="your-app-password"
+ENV FROM_EMAIL="noreply@homeschool.com"
 
 RUN npm run build
 
