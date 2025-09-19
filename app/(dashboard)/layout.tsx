@@ -7,6 +7,8 @@ import Sidebar from '@/components/dashboard/Sidebar'
 import Navbar from '@/components/dashboard/Navbar'
 import { LoadingSidebar, LoadingDashboard } from '@/components/ui/loading-skeleton'
 
+export const dynamic = 'force-dynamic'
+
 export default function DashboardLayout({
   children,
 }: {
