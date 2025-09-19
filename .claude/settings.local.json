@@ -35,7 +35,9 @@
       "Bash(npx tsx:*)",
       "Bash(docker:*)",
       "Bash(winget install:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(mkdir:*)",
+      "Bash(where docker)"
     ],
     "deny": [],
     "ask": []
