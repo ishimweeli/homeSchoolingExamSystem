@@ -10,14 +10,18 @@ WORKDIR /app
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
 RUN \
-  if [ -f package-lock.json ]; then npm ci --only=production; \
+  if [ -f package-lock.json ]; then npm ci; \
   else echo "Lockfile not found." && exit 1; \
   fi
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+
+# Install all dependencies (including dev dependencies) for building
+COPY package.json package-lock.json* ./
+RUN npm ci
+
 COPY . .
 
 # Generate Prisma Client
@@ -28,7 +32,14 @@ RUN npx prisma generate
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Environment variables are now provided by GitHub Actions workflow
+# Set hardcoded environment variables for build time
+ENV DATABASE_URL="postgresql://postgres:password123@localhost:5432/homeschooling_exam_db"
+ENV NEXTAUTH_SECRET="hardcoded-secret-change-in-production-later"
+ENV NEXTAUTH_URL="http://localhost:3001"
+ENV OPENAI_API_KEY="sk-hardcoded-openai-key-change-later"
+ENV NODE_ENV="production"
+ENV UPLOADTHING_SECRET="hardcoded-uploadthing-secret"
+ENV UPLOADTHING_APP_ID="hardcoded-uploadthing-app-id"
 
 RUN npm run build
 
