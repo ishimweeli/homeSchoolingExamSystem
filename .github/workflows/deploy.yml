@@ -27,10 +27,13 @@ jobs:
       - name: Build Next.js app
         run: npm run build
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DATABASE_URL: "postgresql://postgres:password123@localhost:5432/homeschooling_exam_db"
+          NEXTAUTH_SECRET: "hardcoded-secret-change-in-production-later"
+          NEXTAUTH_URL: "http://localhost:3001"
+          OPENAI_API_KEY: "sk-hardcoded-openai-key-change-later"
+          NODE_ENV: "production"
+          UPLOADTHING_SECRET: "hardcoded-uploadthing-secret"
+          UPLOADTHING_APP_ID: "hardcoded-uploadthing-app-id"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
