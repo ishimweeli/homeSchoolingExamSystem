@@ -6,21 +6,25 @@ export default withAuth(
     const token = req.nextauth.token
     const path = req.nextUrl.pathname
 
+    // Use req.nextUrl.clone() to create new URL instances safely
+    const url = req.nextUrl.clone()
+    url.pathname = '/dashboard'
+
     // Admin routes protection
     if (path.startsWith('/admin') && token?.role !== 'ADMIN') {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+      return NextResponse.redirect(url)
     }
 
     // Parent/Teacher routes protection
     if (path.startsWith('/exams/create') || path.startsWith('/children')) {
       if (!['PARENT', 'TEACHER', 'ADMIN'].includes(token?.role as string)) {
-        return NextResponse.redirect(new URL('/dashboard', req.url))
+        return NextResponse.redirect(url)
       }
     }
 
     // Student routes protection
     if (path.startsWith('/exams/take') && token?.role !== 'STUDENT') {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+      return NextResponse.redirect(url)
     }
 
     return NextResponse.next()
