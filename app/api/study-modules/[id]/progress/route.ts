@@ -75,8 +75,33 @@ export async function POST(
       totalXP,
       livesRemaining,
       streak,
-      completedLessons
-    } = body;
+      completedLessons,
+      includeCurrentStepCompleted,
+      moduleCompleted
+    } = body as any;
+
+    // Calculate overall progress using real lesson/step counts
+    const lessons = await prisma.studyLesson.findMany({
+      where: { moduleId: params.id },
+      include: { steps: true },
+      orderBy: { order: 'asc' }
+    });
+
+    const totalSteps = lessons.reduce((sum, l) => sum + l.steps.length, 0) || 1;
+    const completedStepsBeforeCurrent = lessons
+      .slice(0, Math.max(0, currentLesson))
+      .reduce((sum, l) => sum + l.steps.length, 0);
+    const completedSteps = Math.max(
+      0,
+      Math.min(
+        totalSteps,
+        completedStepsBeforeCurrent + currentStep + (includeCurrentStepCompleted ? 1 : 0)
+      )
+    );
+    let overall = Math.floor((completedSteps / totalSteps) * 100);
+    if (moduleCompleted) {
+      overall = 100;
+    }
 
     // Update assignment progress
     const assignment = await prisma.studyModuleAssignment.updateMany({
@@ -91,7 +116,9 @@ export async function POST(
         lives: livesRemaining,
         streak,
         lastActiveAt: new Date(),
-        overallProgress: Math.floor((currentLesson / 5 + currentStep / 25) * 100) // Rough progress calculation
+        overallProgress: overall,
+        status: moduleCompleted ? 'COMPLETED' : undefined,
+        completedAt: moduleCompleted ? new Date() : undefined
       }
     });
 

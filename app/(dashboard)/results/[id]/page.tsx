@@ -125,8 +125,8 @@ export default function DetailedResultPage() {
   };
 
   const getAnswerStatus = (questionId: string) => {
-    const answer = result?.answers.find(a => a.questionId === questionId);
-    const question = result?.exam.questions.find(q => q.id === questionId);
+    const answer = (result?.answers || []).find(a => a.questionId === questionId);
+    const question = (result?.exam?.questions || []).find(q => q.id === questionId);
     
     if (!answer || !question) return 'unanswered';
     
@@ -157,15 +157,9 @@ export default function DetailedResultPage() {
     console.log('Sharing result...');
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // Don't block the whole screen; show skeletons in the content below
 
-  if (!result) {
+  if (!loading && !result) {
     return (
       <div className="container mx-auto p-6">
         <Card className="max-w-2xl mx-auto">
@@ -200,6 +194,7 @@ export default function DetailedResultPage() {
   }
 
   const getStudentDisplayName = () => {
+    if (!result || !result.student) return 'Unknown';
     const student = result.student;
     if (student.firstName || student.lastName) {
       return `${student.firstName || ''} ${student.lastName || ''}`.trim();
@@ -222,20 +217,20 @@ export default function DetailedResultPage() {
         
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold">{result.exam.title}</h1>
+            <h1 className="text-3xl font-bold">{loading ? 'Loading…' : result?.exam?.title || '—'}</h1>
             <p className="text-muted-foreground mt-2">
-              {result.exam.subject} • Grade {result.exam.gradeLevel}
+              {loading ? '—' : `${result?.exam?.subject || '—'} • Grade ${result?.exam?.gradeLevel ?? '—'}`}
             </p>
             {session?.user?.role !== 'STUDENT' && (
               <p className="text-sm mt-1">
-                Student: {getStudentDisplayName()}
+                {loading ? ' ' : <>Student: {getStudentDisplayName()}</>}
               </p>
             )}
           </div>
           <div className="flex gap-2">
-            {session?.user?.role !== 'STUDENT' && result.status !== 'graded' && (
+            {!loading && result && session?.user?.role !== 'STUDENT' && result.status !== 'graded' && (
               <Button 
-                onClick={() => router.push(`/results/${result.id}/grade`)}
+                onClick={() => router.push(`/results/${result?.id}/grade`)}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 Grade Exam
@@ -264,25 +259,33 @@ export default function DetailedResultPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Total Score</span>
-                <span className={`text-2xl font-bold ${getScoreColor(result.percentage)}`}>
-                  {result.totalScore}/{result.exam.totalMarks}
-                </span>
+                {loading ? (
+                  <span className="text-2xl font-bold text-gray-300">—</span>
+                ) : (
+                  <span className={`text-2xl font-bold ${getScoreColor(result?.percentage || 0)}`}>
+                    {result?.totalScore ?? 0}/{result?.exam?.totalMarks ?? 0}
+                  </span>
+                )}
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Percentage</span>
-                <span className={`text-2xl font-bold ${getScoreColor(result.percentage)}`}>
-                  {result.percentage.toFixed(1)}%
-                </span>
+                {loading ? (
+                  <span className="text-2xl font-bold text-gray-300">—</span>
+                ) : (
+                  <span className={`text-2xl font-bold ${getScoreColor(result?.percentage || 0)}`}>
+                    {(result?.percentage ?? 0).toFixed(1)}%
+                  </span>
+                )}
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Grade</span>
-                {result.grade && (
+                {!loading && result.grade && (
                   <Badge className={`text-lg px-4 py-1 ${getGradeColor(result.grade)}`}>
                     {result.grade}
                   </Badge>
                 )}
               </div>
-              <Progress value={result.percentage} className="h-3" />
+              <Progress value={loading ? 0 : (result?.percentage ?? 0)} className="h-3" />
             </div>
           </CardContent>
         </Card>
@@ -296,28 +299,27 @@ export default function DetailedResultPage() {
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">
-                  Submitted: {result.attempt.submittedAt 
+                  Submitted: {loading ? '—' : (result?.attempt?.submittedAt 
                     ? format(new Date(result.attempt.submittedAt), 'PPp')
-                    : 'Not submitted'}
+                    : 'Not submitted')}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">
-                  Time Spent: {result.attempt.timeSpent || 0} minutes
-                  {result.exam.duration && ` / ${result.exam.duration} minutes`}
+                  Time Spent: {loading ? '—' : `${result?.attempt?.timeSpent || 0} minutes${result?.exam?.duration ? ` / ${result?.exam?.duration} minutes` : ''}`}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">
-                  Questions: {result.exam.questions.length}
+                  Questions: {loading ? '—' : (result?.exam?.questions?.length ?? 0)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Award className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">
-                  Status: <Badge variant="outline">{result.status}</Badge>
+                  Status: <Badge variant="outline">{loading ? '—' : (result?.status || '—')}</Badge>
                 </span>
               </div>
             </div>
@@ -333,15 +335,15 @@ export default function DetailedResultPage() {
           </CardHeader>
           <CardContent className="text-center">
             <div className="text-3xl font-bold text-green-600">
-              {result.answers.filter(a => {
-                const question = result.exam.questions.find(q => q.id === a.questionId);
+              {(result?.answers || []).filter(a => {
+                const question = (result?.exam?.questions || []).find(q => q.id === a.questionId);
                 if (!question) return false;
                 const percentage = ((a.finalScore || 0) / question.marks) * 100;
                 return percentage >= 70;
               }).length}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
-              out of {result.exam.questions.length} questions
+              out of {result?.exam?.questions?.length || 0} questions
             </p>
           </CardContent>
         </Card>
@@ -352,8 +354,8 @@ export default function DetailedResultPage() {
           </CardHeader>
           <CardContent className="text-center">
             <div className="text-3xl font-bold text-red-600">
-              {result.answers.filter(a => {
-                const question = result.exam.questions.find(q => q.id === a.questionId);
+              {(result?.answers || []).filter(a => {
+                const question = (result?.exam?.questions || []).find(q => q.id === a.questionId);
                 if (!question) return false;
                 const percentage = ((a.finalScore || 0) / question.marks) * 100;
                 return percentage < 40;
@@ -371,8 +373,8 @@ export default function DetailedResultPage() {
           </CardHeader>
           <CardContent className="text-center">
             <div className="text-3xl font-bold text-yellow-600">
-              {result.answers.filter(a => {
-                const question = result.exam.questions.find(q => q.id === a.questionId);
+              {(result?.answers || []).filter(a => {
+                const question = (result?.exam?.questions || []).find(q => q.id === a.questionId);
                 if (!question) return false;
                 const percentage = ((a.finalScore || 0) / question.marks) * 100;
                 return percentage >= 40 && percentage < 70;
@@ -386,7 +388,7 @@ export default function DetailedResultPage() {
       </div>
 
       {/* Overall Feedback */}
-      {result.overallFeedback && (
+      {result?.overallFeedback && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>AI Analysis & Feedback</CardTitle>
@@ -396,9 +398,9 @@ export default function DetailedResultPage() {
           </CardHeader>
           <CardContent>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-blue-800">{result.overallFeedback}</p>
+              <p className="text-blue-800">{result?.overallFeedback}</p>
             </div>
-            {result.aiAnalysis?.generatedAt && (
+            {result?.aiAnalysis?.generatedAt && (
               <p className="text-xs text-muted-foreground mt-2">
                 Analysis generated: {format(new Date(result.aiAnalysis.generatedAt), 'PPp')}
               </p>
@@ -408,14 +410,15 @@ export default function DetailedResultPage() {
       )}
 
       {/* Question-wise Results */}
+      {result?.exam && (
       <Card>
         <CardHeader>
           <CardTitle>Question-wise Analysis</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {result.exam.questions.map((question, index) => {
-              const answer = result.answers.find(a => a.questionId === question.id);
+            {(result?.exam?.questions || []).map((question, index) => {
+              const answer = (result?.answers || []).find(a => a.questionId === question.id);
               const status = getAnswerStatus(question.id);
               
               return (
@@ -525,6 +528,7 @@ export default function DetailedResultPage() {
           </div>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

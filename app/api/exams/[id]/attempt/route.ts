@@ -44,6 +44,26 @@ export async function POST(
       return NextResponse.json({ error: 'You are not assigned to this exam' }, { status: 403 });
     }
 
+    // Subscription gating
+    const sub = await prisma.subscription.findFirst({
+      where: { userId: session.user.id, status: 'ACTIVE', expiresAt: { gt: new Date() } },
+      include: { tier: true }
+    });
+
+    if (!sub) {
+      return NextResponse.json({ error: 'Subscription required' }, { status: 402 });
+    }
+
+    // Check attempts allowed by tier
+    if (sub.tier.maxAttemptsPerExam > 0) {
+      const currentAttemptsForExam = await prisma.examAttempt.count({
+        where: { examId, studentId: session.user.id }
+      });
+      if (currentAttemptsForExam >= sub.tier.maxAttemptsPerExam) {
+        return NextResponse.json({ error: 'Attempt limit reached for your tier' }, { status: 403 });
+      }
+    }
+
     // Check attempt limits
     const attemptCount = await prisma.examAttempt.count({
       where: {

@@ -45,6 +45,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Number of lessons must be between 1 and 25' }, { status: 400 });
     }
 
+    // Subscription gating for creators (teachers/parents)
+    const creatorSub = await prisma.subscription.findFirst({
+      where: { userId: session.user.id, status: 'ACTIVE', expiresAt: { gt: new Date() } },
+      include: { tier: true }
+    });
+    if (!creatorSub) {
+      return NextResponse.json({ error: 'Active subscription required to create study modules' }, { status: 402 });
+    }
+    if (creatorSub.tier.creatorModuleCreateLimitPerPeriod > 0) {
+      const createdCount = await prisma.studyModule.count({
+        where: { createdBy: session.user.id, createdAt: { gte: creatorSub.lastResetAt } }
+      });
+      if (createdCount >= creatorSub.tier.creatorModuleCreateLimitPerPeriod) {
+        return NextResponse.json({ error: 'Creator module limit reached for your tier' }, { status: 403 });
+      }
+    }
+
     console.log(`🚀 Starting AI generation for "${topic}" (${numberOfLessons} lessons, Grade ${gradeLevel})`);
 
     // Generate comprehensive study module with AI

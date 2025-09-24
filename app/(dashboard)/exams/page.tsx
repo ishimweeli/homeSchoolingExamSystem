@@ -119,13 +119,7 @@ export default function ExamsListPage() {
     }
   }
 
-  if (status === 'loading' || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-64">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    )
-  }
+  // Render the page shell immediately; show skeletons for list while loading
 
   if (!session) {
     return null
@@ -177,7 +171,23 @@ export default function ExamsListPage() {
       </div>
 
       {/* Exams List */}
-      {filteredExams.length === 0 ? (
+      {loading ? (
+        <div className="grid gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-sm p-6">
+              <div className="animate-pulse space-y-4">
+                <div className="h-5 bg-gray-200 rounded w-1/3"></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[...Array(4)].map((_, j) => (
+                    <div key={j} className="h-4 bg-gray-200 rounded"></div>
+                  ))}
+                </div>
+                <div className="h-8 bg-gray-200 rounded w-32"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredExams.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
           <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">

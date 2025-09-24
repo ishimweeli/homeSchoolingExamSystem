@@ -46,6 +46,23 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = generateExamSchema.parse(body)
 
+    // Subscription gating for creators (teachers/parents)
+    const creatorSub = await prisma.subscription.findFirst({
+      where: { userId: session.user.id, status: 'ACTIVE', expiresAt: { gt: new Date() } },
+      include: { tier: true }
+    })
+    if (!creatorSub) {
+      return NextResponse.json({ error: 'Active subscription required to create exams' }, { status: 402 })
+    }
+    if (creatorSub.tier.creatorExamCreateLimitPerPeriod > 0) {
+      const createdCount = await prisma.exam.count({
+        where: { creatorId: session.user.id, createdAt: { gte: creatorSub.lastResetAt } }
+      })
+      if (createdCount >= creatorSub.tier.creatorExamCreateLimitPerPeriod) {
+        return NextResponse.json({ error: 'Creator exam limit reached for your tier' }, { status: 403 })
+      }
+    }
+
     // Generate questions using AI
     const generatedQuestions = await aiService.generateExam({
       subject: validatedData.subject,

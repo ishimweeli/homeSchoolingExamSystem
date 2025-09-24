@@ -65,6 +65,43 @@ export async function GET(
       }
     }
 
+    // Check subscription gating for students
+    if (session.user.role === 'STUDENT') {
+      // Find active subscription
+      const sub = await prisma.subscription.findFirst({
+        where: {
+          userId: session.user.id,
+          status: 'ACTIVE',
+          expiresAt: { gt: new Date() }
+        },
+        include: { tier: true }
+      });
+
+      if (!sub) {
+        return NextResponse.json({ error: 'Subscription required' }, { status: 402 });
+      }
+
+      // Track module access in current period if limit set
+      if (sub.tier.studyModuleLimitPerPeriod > 0) {
+        // Check if this module already counted this period
+        const already = await prisma.subscriptionModuleAccess.findFirst({
+          where: { subscriptionId: sub.id, moduleId: module.id }
+        });
+        if (!already) {
+          // If limit reached, block
+          const count = await prisma.subscriptionModuleAccess.count({
+            where: { subscriptionId: sub.id }
+          });
+          if (count >= sub.tier.studyModuleLimitPerPeriod) {
+            return NextResponse.json({ error: 'Module access limit reached for this period' }, { status: 402 });
+          }
+          await prisma.subscriptionModuleAccess.create({
+            data: { subscriptionId: sub.id, moduleId: module.id }
+          });
+        }
+      }
+    }
+
     return NextResponse.json({ module });
 
   } catch (error) {

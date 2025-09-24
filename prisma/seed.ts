@@ -86,12 +86,46 @@ async function main() {
   })
 
   console.log({ admin, teacher, parent, student })
+  // Seed default subscription tiers
+  const starter = await prisma.subscriptionTier.upsert({
+    where: { id: 'starter-fixed-id' },
+    update: {},
+    create: {
+      id: 'starter-fixed-id',
+      name: 'Starter',
+      description: '5 exams and 5 modules per month',
+      priceCents: 500,
+      currency: 'USD',
+      interval: 'MONTH',
+      examLimitPerPeriod: 5,
+      studyModuleLimitPerPeriod: 5,
+      maxAttemptsPerExam: 2,
+      isActive: true
+    }
+  })
+
+  // Assign starter tier to student for immediate access
+  const now = new Date()
+  const expires = new Date(now)
+  expires.setMonth(expires.getMonth() + 1)
+  await prisma.subscription.upsert({
+    where: { id: 'student-starter-sub' },
+    update: { expiresAt: expires },
+    create: {
+      id: 'student-starter-sub',
+      userId: student.id,
+      tierId: starter.id,
+      expiresAt: expires,
+      autoRenew: false
+    }
+  })
   console.log('Seed completed!')
   console.log('\nTest accounts created:')
   console.log('Admin: admin@test.com / password123')
   console.log('Teacher: teacher@test.com / password123')
   console.log('Parent: parent@test.com / password123')
   console.log('Student: student@test.com / password123')
+  console.log('\nDefault Tier: Starter ($5/month) assigned to student@test.com')
 }
 
 main()

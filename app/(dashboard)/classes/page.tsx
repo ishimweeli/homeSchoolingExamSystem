@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/loading-skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -163,13 +164,7 @@ export default function ClassesPage() {
     return students.filter(s => !classStudentIds.includes(s.id));
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // Render page shell immediately; show skeletons where content is loading
 
   return (
     <div className="container mx-auto p-6">
@@ -236,7 +231,29 @@ export default function ClassesPage() {
         </Dialog>
       </div>
 
-      {classes.length === 0 ? (
+      {loading ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-5 w-1/2" />
+                <Skeleton className="h-4 w-1/3 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  {[...Array(3)].map((_, j) => (
+                    <div key={j} className="flex justify-between items-center">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-6 w-16" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : classes.length === 0 ? (
         <Card>
           <CardContent className="p-6">
             <p className="text-center text-muted-foreground">

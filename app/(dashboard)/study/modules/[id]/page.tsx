@@ -141,12 +141,27 @@ export default function StudyModulePage() {
     return lesson.steps[stepIndex];
   };
 
-  const saveProgress = async () => {
+  const calculateOverallProgress = () => {
+    if (!module) return 0;
+    const allLessons = module.lessons || [];
+    const totalSteps = allLessons.reduce((sum, l) => sum + (l.steps?.length || 0), 0) || 1;
+    const completedStepsBefore = allLessons
+      .slice(0, Math.max(0, progress.currentLesson))
+      .reduce((sum, l) => sum + (l.steps?.length || 0), 0);
+    const completedSteps = Math.max(0, Math.min(totalSteps, completedStepsBefore + progress.currentStep));
+    return Math.floor((completedSteps / totalSteps) * 100);
+  };
+
+  const saveProgress = async (options?: { includeCurrentStep?: boolean; moduleCompleted?: boolean }) => {
     try {
       await fetch(`/api/study-modules/${params.id}/progress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(progress)
+        body: JSON.stringify({
+          ...progress,
+          includeCurrentStepCompleted: !!options?.includeCurrentStep,
+          moduleCompleted: !!options?.moduleCompleted
+        })
       });
     } catch (error) {
       console.error('Error saving progress:', error);
@@ -239,7 +254,7 @@ export default function StudyModulePage() {
       handleLessonComplete();
     }
 
-    saveProgress();
+    saveProgress({ includeCurrentStep: true });
   };
 
   const handleLessonComplete = () => {
@@ -275,13 +290,28 @@ export default function StudyModulePage() {
       setStepAnswers([]);
     } else {
       // Module complete!
-      toast.success('🎊 Congratulations! You completed the entire module!');
+      // Award a celebratory "flowers" badge locally and persist completion
+      setProgress(prev => ({ ...prev, badges: [...prev.badges, 'FLOWERS'] }));
+      toast.success('🎊 Congratulations! You completed the entire module! 🌸🌼🌺');
+      // Persist with completion flag so backend sets 100% and status
+      saveProgress({ includeCurrentStep: true, moduleCompleted: true });
       setTimeout(() => {
         router.push('/study');
-      }, 3000);
+      }, 2500);
     }
 
-    saveProgress();
+    // For non-final lessons we already persisted above
+  };
+
+  // Determine lesson locking states: only current and completed lessons are open
+  const getLessonLockStates = () => {
+    if (!module) return [] as { id: string; title: string; locked: boolean; active: boolean; completed: boolean }[];
+    return module.lessons.map((l, idx) => {
+      const isCurrent = idx === progress.currentLesson;
+      const isCompleted = idx < progress.currentLesson;
+      const locked = idx > progress.currentLesson; // future lessons locked
+      return { id: l.id, title: l.title, locked, active: isCurrent, completed: isCompleted };
+    });
   };
 
   const renderStepContent = () => {
@@ -438,7 +468,29 @@ export default function StudyModulePage() {
       );
     }
 
-    return null;
+    // Fallback for QUIZ, REVIEW, CHALLENGE or any unknown step types
+    return (
+      <div className="space-y-6">
+        <div className="bg-yellow-50 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
+          {step.content?.explanation && (
+            <p className="text-sm text-gray-700">{step.content.explanation}</p>
+          )}
+          {!step.content?.explanation && (
+            <p className="text-sm text-gray-700">
+              Review this step, then click Complete to continue.
+            </p>
+          )}
+        </div>
+
+        <Button 
+          onClick={handleStepComplete}
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
+        >
+          Complete Step <ChevronRight className="h-4 w-4 ml-2" />
+        </Button>
+      </div>
+    );
   };
 
   if (loading) {
@@ -516,15 +568,44 @@ export default function StudyModulePage() {
         <div className="mt-4">
           <div className="flex justify-between text-sm mb-1">
             <span>Overall Progress</span>
-            <span>
-              {progress.completedLessons.length} / {module.totalLessons} Lessons
-            </span>
+            <span className="font-semibold">{calculateOverallProgress()}%</span>
           </div>
           <Progress 
-            value={(progress.completedLessons.length / module.totalLessons) * 100}
+            value={calculateOverallProgress()}
             className="h-2"
           />
         </div>
+      </div>
+
+      {/* Lesson Navigator (Locked/Active/Completed) */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+        {getLessonLockStates().map((l, idx) => (
+          <button
+            key={l.id}
+            disabled={l.locked}
+            onClick={() => {
+              if (!l.locked) setProgress(prev => ({ ...prev, currentLesson: idx, currentStep: 0 }));
+            }}
+            className={cn(
+              "p-3 rounded-lg border text-left transition-colors",
+              l.completed && "bg-green-50 border-green-300",
+              l.active && !l.completed && "bg-purple-50 border-purple-300",
+              l.locked && "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-sm truncate">Lesson {idx + 1}</span>
+              {l.locked ? (
+                <Lock className="h-4 w-4" />
+              ) : l.completed ? (
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-purple-600" />
+              )}
+            </div>
+            <div className="text-xs mt-1 truncate">{module?.lessons[idx]?.title}</div>
+          </button>
+        ))}
       </div>
 
       {/* Lesson Path */}
@@ -579,8 +660,8 @@ export default function StudyModulePage() {
       <div className="flex justify-center">
         <Button
           variant="outline"
-          onClick={() => {
-            saveProgress();
+          onClick={async () => {
+            await saveProgress();
             router.push('/study');
           }}
         >

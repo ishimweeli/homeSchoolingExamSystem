@@ -167,18 +167,12 @@ export default function TakeExamPage() {
 
   const getProgressPercentage = () => {
     const answeredCount = Object.keys(answers).length;
-    return (answeredCount / (exam?.questions.length || 1)) * 100;
+    return (answeredCount / ((exam?.questions?.length || 1))) * 100;
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // Don't block the route; show shell and placeholders below
 
-  if (!exam) {
+  if (!loading && !exam) {
     return (
       <div className="container mx-auto p-6">
         <Card>
@@ -190,8 +184,9 @@ export default function TakeExamPage() {
     );
   }
 
-  const currentQuestion = exam.questions[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === exam.questions.length - 1;
+  const totalQuestions = exam?.questions?.length || 0;
+  const currentQuestion = exam?.questions?.[currentQuestionIndex];
+  const isLastQuestion = totalQuestions > 0 ? (currentQuestionIndex === totalQuestions - 1) : true;
   const isFirstQuestion = currentQuestionIndex === 0;
 
   return (
@@ -206,13 +201,13 @@ export default function TakeExamPage() {
                   <BookOpen className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">{exam.title}</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">{loading ? 'Loading…' : exam?.title}</h1>
                   <div className="flex items-center gap-4 mt-2">
                     <Badge variant="outline" className="font-normal">
-                      {exam.subject}
+                      {loading ? '—' : exam?.subject}
                     </Badge>
-                    <span className="text-sm text-gray-500">Grade {(exam as any).gradeLevel}</span>
-                    {exam.description && (
+                    <span className="text-sm text-gray-500">{loading ? '—' : `Grade ${(exam as any)?.gradeLevel}`}</span>
+                    {!loading && exam?.description && (
                       <span className="text-sm text-gray-500">• {exam.description}</span>
                     )}
                   </div>
@@ -246,7 +241,7 @@ export default function TakeExamPage() {
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-700">Exam Progress</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {Object.keys(answers).length} of {exam.questions.length} answered
+                  {Object.keys(answers).length} of {totalQuestions} answered
                 </span>
               </div>
               <Progress value={getProgressPercentage()} className="h-2" />
@@ -255,7 +250,7 @@ export default function TakeExamPage() {
                   {Math.round(getProgressPercentage())}% Complete
                 </span>
                 <span className="text-xs text-gray-500">
-                  {exam.questions.length - Object.keys(answers).length} questions remaining
+                  {Math.max(totalQuestions - Object.keys(answers).length, 0)} questions remaining
                 </span>
               </div>
             </div>
@@ -272,22 +267,22 @@ export default function TakeExamPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-5 gap-2">
-                  {exam.questions.map((q, index) => (
+                  {(loading ? Array.from({ length: 10 }) : exam?.questions || []).map((q: any, index: number) => (
                     <button
                       key={index}
                       onClick={() => setCurrentQuestionIndex(index)}
                       className={`
                         relative h-10 w-10 rounded-lg font-medium text-sm transition-all
-                        ${index === currentQuestionIndex
+                        ${!loading && index === currentQuestionIndex
                           ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg scale-110'
-                          : answers[exam.questions[index].id]
+                          : (!loading && exam?.questions?.[index]?.id && answers[exam.questions[index].id])
                           ? 'bg-green-100 text-green-700 hover:bg-green-200'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }
                       `}
                     >
                       {index + 1}
-                      {answers[exam.questions[index].id] && index !== currentQuestionIndex && (
+                      {!loading && exam?.questions?.[index]?.id && answers[exam.questions[index].id] && index !== currentQuestionIndex && (
                         <CheckCircle2 className="absolute -top-1 -right-1 h-3 w-3 text-green-600" />
                       )}
                     </button>
@@ -324,14 +319,16 @@ export default function TakeExamPage() {
                         Question {currentQuestionIndex + 1}
                       </span>
                     </div>
-                    <Badge variant="secondary" className="font-normal">
-                      {currentQuestion.type.replace('_', ' ').toLowerCase()}
-                    </Badge>
+                    {currentQuestion && (
+                      <Badge variant="secondary" className="font-normal">
+                        {currentQuestion.type.replace('_', ' ').toLowerCase()}
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Trophy className="h-4 w-4 text-yellow-500" />
                     <span className="font-semibold text-gray-700">
-                      {currentQuestion.marks} {currentQuestion.marks === 1 ? 'mark' : 'marks'}
+                      {loading || !currentQuestion ? '—' : `${currentQuestion.marks || 0} ${currentQuestion.marks === 1 ? 'mark' : 'marks'}`}
                     </span>
                   </div>
                 </div>
@@ -342,13 +339,13 @@ export default function TakeExamPage() {
                   {/* Question Text */}
                   <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-100">
                     <p className="text-lg font-medium text-gray-800 leading-relaxed">
-                      {currentQuestion.question}
+                      {loading ? 'Loading question…' : currentQuestion?.question}
                     </p>
                   </div>
 
                   {/* Answer Options */}
                   <div className="space-y-4">
-                    {currentQuestion.type === 'MULTIPLE_CHOICE' && currentQuestion.options && (
+                    {!loading && currentQuestion && currentQuestion.type === 'MULTIPLE_CHOICE' && currentQuestion.options && (
                       <RadioGroup
                         value={answers[currentQuestion.id] || ''}
                         onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
@@ -387,7 +384,7 @@ export default function TakeExamPage() {
                       </RadioGroup>
                     )}
 
-                    {currentQuestion.type === 'TRUE_FALSE' && (
+                    {!loading && currentQuestion && currentQuestion.type === 'TRUE_FALSE' && (
                       <RadioGroup
                         value={answers[currentQuestion.id] || ''}
                         onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
@@ -432,7 +429,7 @@ export default function TakeExamPage() {
                       </RadioGroup>
                     )}
 
-                    {currentQuestion.type === 'SHORT_ANSWER' && (
+                    {!loading && currentQuestion && currentQuestion.type === 'SHORT_ANSWER' && (
                       <div className="space-y-2">
                         <Label className="text-sm font-medium text-gray-700">Your Answer:</Label>
                         <Input
@@ -444,7 +441,7 @@ export default function TakeExamPage() {
                       </div>
                     )}
 
-                    {(currentQuestion.type === 'LONG_ANSWER' || currentQuestion.type === 'ESSAY') && (
+                    {!loading && currentQuestion && (currentQuestion.type === 'LONG_ANSWER' || currentQuestion.type === 'ESSAY') && (
                       <div className="space-y-2">
                         <Label className="text-sm font-medium text-gray-700">Your Answer:</Label>
                         <Textarea
@@ -459,7 +456,7 @@ export default function TakeExamPage() {
                       </div>
                     )}
 
-                    {currentQuestion.type === 'FILL_BLANKS' && (() => {
+                    {!loading && currentQuestion && currentQuestion.type === 'FILL_BLANKS' && (() => {
                       // Parse the question to find blanks (marked with _____ or parentheses)
                       const questionText = currentQuestion.question;
                       const blankPattern = /(_+|\([^)]*\))/g;
@@ -538,7 +535,7 @@ export default function TakeExamPage() {
 
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-500">
-                      {currentQuestionIndex + 1} of {exam.questions.length}
+                      {currentQuestionIndex + 1} of {totalQuestions}
                     </span>
                   </div>
 
@@ -585,21 +582,21 @@ export default function TakeExamPage() {
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-medium text-gray-700">Exam Progress</span>
                     <span className="text-sm font-bold text-gray-900">
-                      {Math.round((Object.keys(answers).length / exam.questions.length) * 100)}%
+                      {totalQuestions ? Math.round((Object.keys(answers).length / totalQuestions) * 100) : 0}%
                     </span>
                   </div>
-                  <Progress value={(Object.keys(answers).length / exam.questions.length) * 100} className="h-2" />
+                  <Progress value={(totalQuestions ? (Object.keys(answers).length / totalQuestions) * 100 : 0)} className="h-2" />
                   <div className="flex justify-between mt-3 text-xs">
                     <span className="text-gray-600">
                       {Object.keys(answers).length} answered
                     </span>
                     <span className="text-gray-600">
-                      {exam.questions.length - Object.keys(answers).length} remaining
+                      {Math.max(totalQuestions - Object.keys(answers).length, 0)} remaining
                     </span>
                   </div>
                 </div>
 
-                {Object.keys(answers).length < exam.questions.length && (
+                {Object.keys(answers).length < totalQuestions && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
                     <div className="flex items-start gap-3">
                       <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
@@ -608,7 +605,7 @@ export default function TakeExamPage() {
                           Incomplete Submission
                         </p>
                         <p className="text-yellow-700 text-xs mt-1">
-                          You have {exam.questions.length - Object.keys(answers).length} unanswered questions. 
+                          You have {Math.max(totalQuestions - Object.keys(answers).length, 0)} unanswered questions. 
                           These will be marked as incorrect.
                         </p>
                       </div>
@@ -616,7 +613,7 @@ export default function TakeExamPage() {
                   </div>
                 )}
 
-                {Object.keys(answers).length === exam.questions.length && (
+                {Object.keys(answers).length === totalQuestions && totalQuestions > 0 && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />

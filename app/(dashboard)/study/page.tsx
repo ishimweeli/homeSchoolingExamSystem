@@ -22,6 +22,7 @@ import {
   Heart
 } from 'lucide-react';
 import Link from 'next/link';
+import { Skeleton } from '@/components/ui/loading-skeleton'
 
 interface StudyModule {
   id: string;
@@ -60,6 +61,28 @@ export default function StudyPage() {
     fetchModules();
   }, []);
 
+  const [creatorAllowed, setCreatorAllowed] = useState<boolean>(true);
+  const [creatorReason, setCreatorReason] = useState<string>('');
+
+  useEffect(() => {
+    const checkSub = async () => {
+      const res = await fetch('/api/subscriptions/me');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.active) {
+        setCreatorAllowed(false);
+        setCreatorReason('Active subscription required');
+        return;
+      }
+      // Optional: fetch counts server-side; for now we allow and let API enforce heavy check
+      setCreatorAllowed(true);
+      setCreatorReason('');
+    };
+    if (session?.user && (session.user.role === 'TEACHER' || session.user.role === 'PARENT')) {
+      checkSub();
+    }
+  }, [session?.user]);
+
   const fetchModules = async () => {
     try {
       const response = await fetch('/api/study-modules');
@@ -93,14 +116,6 @@ export default function StudyPage() {
 
   const isTeacherOrParent = session?.user?.role === 'TEACHER' || session?.user?.role === 'PARENT';
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -117,7 +132,7 @@ export default function StudyPage() {
           
           {isTeacherOrParent && (
             <Link href="/study/create">
-              <Button size="lg" className="bg-white text-purple-600 hover:bg-purple-50">
+              <Button size="lg" className="bg-white text-purple-600 hover:bg-purple-50" disabled={!creatorAllowed} title={!creatorAllowed ? creatorReason : undefined}>
                 <Plus className="h-5 w-5 mr-2" />
                 Create Module
               </Button>
@@ -170,7 +185,28 @@ export default function StudyPage() {
 
       {/* Modules Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {modules.length > 0 ? (
+        {loading ? (
+          [...Array(6)].map((_, i) => (
+            <Card key={i} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <Skeleton className="h-5 w-1/2" />
+                <Skeleton className="h-4 w-3/4 mt-2" />
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Skeleton className="h-5 w-20" />
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="h-5 w-28" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-2/3" />
+                  <Skeleton className="h-8 w-32" />
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : modules.length > 0 ? (
           modules.map((module) => {
             const progress = calculateProgress(module);
             const isLocked = false; // TODO: Implement prerequisites

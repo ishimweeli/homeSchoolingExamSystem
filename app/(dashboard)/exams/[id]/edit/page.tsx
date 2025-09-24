@@ -157,17 +157,9 @@ export default function ExamEditPage({ params }: PageProps) {
     updateQuestion(questionIndex, 'options', options)
   }
 
-  if (status === 'loading' || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-64">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    )
-  }
+  // Do not block; render shell with disabled controls if still loading
 
-  if (!session || !exam) {
-    return null
-  }
+  if (!session) return null
 
   return (
     <div className="space-y-6">
@@ -181,11 +173,11 @@ export default function ExamEditPage({ params }: PageProps) {
             <ArrowLeft className="h-4 w-4" />
             Back to Exam
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Edit Exam</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{loading ? 'Loading…' : 'Edit Exam'}</h1>
         </div>
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || loading || !exam}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
@@ -203,8 +195,9 @@ export default function ExamEditPage({ params }: PageProps) {
             </label>
             <input
               type="text"
-              value={exam.title}
+              value={exam?.title || ''}
               onChange={(e) => updateExam('title', e.target.value)}
+              disabled={loading || !exam}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -214,8 +207,9 @@ export default function ExamEditPage({ params }: PageProps) {
             </label>
             <input
               type="text"
-              value={exam.subject}
+              value={exam?.subject || ''}
               onChange={(e) => updateExam('subject', e.target.value)}
+              disabled={loading || !exam}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -225,8 +219,9 @@ export default function ExamEditPage({ params }: PageProps) {
             </label>
             <input
               type="number"
-              value={exam.duration}
+              value={exam?.duration ?? 0}
               onChange={(e) => updateExam('duration', parseInt(e.target.value))}
+              disabled={loading || !exam}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -236,8 +231,9 @@ export default function ExamEditPage({ params }: PageProps) {
             </label>
             <input
               type="number"
-              value={exam.totalMarks}
+              value={exam?.totalMarks ?? 0}
               onChange={(e) => updateExam('totalMarks', parseInt(e.target.value))}
+              disabled={loading || !exam}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -246,8 +242,9 @@ export default function ExamEditPage({ params }: PageProps) {
               Description
             </label>
             <textarea
-              value={exam.description}
+              value={exam?.description || ''}
               onChange={(e) => updateExam('description', e.target.value)}
+              disabled={loading || !exam}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -258,9 +255,10 @@ export default function ExamEditPage({ params }: PageProps) {
       {/* Questions */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Questions ({exam.questions.length})</h2>
+          <h2 className="text-lg font-semibold">Questions ({exam?.questions?.length || 0})</h2>
           <button
             onClick={addQuestion}
+            disabled={loading || !exam}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             <Plus className="h-4 w-4" />
@@ -269,12 +267,13 @@ export default function ExamEditPage({ params }: PageProps) {
         </div>
 
         <div className="space-y-6">
-          {exam.questions.map((question, questionIndex) => (
+          {(exam?.questions || []).map((question, questionIndex) => (
             <div key={questionIndex} className="border border-gray-200 rounded-lg p-4">
               <div className="flex items-start justify-between mb-4">
                 <h3 className="font-medium text-gray-900">Question {questionIndex + 1}</h3>
                 <button
                   onClick={() => removeQuestion(questionIndex)}
+                  disabled={loading}
                   className="text-red-600 hover:text-red-800"
                 >
                   <Minus className="h-4 w-4" />
@@ -290,6 +289,7 @@ export default function ExamEditPage({ params }: PageProps) {
                     value={question.question}
                     onChange={(e) => updateQuestion(questionIndex, 'question', e.target.value)}
                     rows={2}
+                    disabled={loading}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -302,6 +302,7 @@ export default function ExamEditPage({ params }: PageProps) {
                     <select
                       value={question.type}
                       onChange={(e) => updateQuestion(questionIndex, 'type', e.target.value)}
+                      disabled={loading}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="MULTIPLE_CHOICE">Multiple Choice</option>
@@ -318,6 +319,7 @@ export default function ExamEditPage({ params }: PageProps) {
                       type="number"
                       value={question.marks}
                       onChange={(e) => updateQuestion(questionIndex, 'marks', parseInt(e.target.value))}
+                      disabled={loading}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -328,6 +330,7 @@ export default function ExamEditPage({ params }: PageProps) {
                     <select
                       value={question.difficulty || 'medium'}
                       onChange={(e) => updateQuestion(questionIndex, 'difficulty', e.target.value)}
+                      disabled={loading}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="easy">Easy</option>
@@ -345,6 +348,7 @@ export default function ExamEditPage({ params }: PageProps) {
                       </label>
                       <button
                         onClick={() => addOption(questionIndex)}
+                        disabled={loading}
                         className="text-blue-600 hover:text-blue-800 text-sm"
                       >
                         + Add Option
@@ -358,11 +362,13 @@ export default function ExamEditPage({ params }: PageProps) {
                             value={option}
                             onChange={(e) => updateOption(questionIndex, optionIndex, e.target.value)}
                             placeholder={`Option ${optionIndex + 1}`}
+                            disabled={loading}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                           {(question.options || []).length > 2 && (
                             <button
                               onClick={() => removeOption(questionIndex, optionIndex)}
+                              disabled={loading}
                               className="text-red-600 hover:text-red-800"
                             >
                               <Minus className="h-4 w-4" />
@@ -382,6 +388,7 @@ export default function ExamEditPage({ params }: PageProps) {
                     <select
                       value={question.correctAnswer}
                       onChange={(e) => updateQuestion(questionIndex, 'correctAnswer', e.target.value)}
+                      disabled={loading}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select correct option</option>
@@ -395,6 +402,7 @@ export default function ExamEditPage({ params }: PageProps) {
                     <select
                       value={question.correctAnswer}
                       onChange={(e) => updateQuestion(questionIndex, 'correctAnswer', e.target.value)}
+                      disabled={loading}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select answer</option>
@@ -407,6 +415,7 @@ export default function ExamEditPage({ params }: PageProps) {
                       onChange={(e) => updateQuestion(questionIndex, 'correctAnswer', e.target.value)}
                       rows={2}
                       placeholder="Enter the correct answer or sample answer"
+                      disabled={loading}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   )}

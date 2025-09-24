@@ -14,6 +14,29 @@ enum Role {
   STUDENT
 }
 
+// Billing & Payments
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum PaymentProvider {
+  FLUTTERWAVE
+}
+
 enum QuestionType {
   MULTIPLE_CHOICE
   TRUE_FALSE
@@ -101,6 +124,10 @@ model User {
   createdStudyAssignments StudyModuleAssignment[] @relation("StudyAssignmentCreator")
   stepProgress StudentStepProgress[] @relation("StudentStepProgress")
   studyProgress StudyProgress[] @relation("StudentProgress")
+
+  // Billing
+  subscriptions Subscription[]
+  payments      Payment[]
   
   // System fields
   isActive          Boolean   @default(true)
@@ -785,6 +812,90 @@ model StudyStep {
   @@unique([lessonId, stepNumber])
   @@index([lessonId])
   @@map("study_steps")
+}
+
+// ===== Subscriptions & Payments =====
+
+model SubscriptionTier {
+  id                       String           @id @default(cuid())
+  name                     String
+  description              String?
+  priceCents               Int              @default(0)
+  currency                 String           @default("USD")
+  interval                 BillingInterval  @default(MONTH)
+  examLimitPerPeriod       Int              @default(0) // 0 = unlimited
+  studyModuleLimitPerPeriod Int             @default(0) // count of distinct modules per period; 0 = unlimited
+  maxAttemptsPerExam       Int              @default(1)
+  // Creator quotas (for TEACHER/PARENT creating content)
+  creatorExamCreateLimitPerPeriod Int       @default(0) // 0 = unlimited
+  creatorModuleCreateLimitPerPeriod Int     @default(0) // 0 = unlimited
+  isActive                 Boolean          @default(true)
+
+  createdAt                DateTime         @default(now()) @map("created_at")
+  updatedAt                DateTime         @updatedAt @map("updated_at")
+
+  subscriptions            Subscription[]
+
+  @@map("subscription_tiers")
+}
+
+model Subscription {
+  id                 String              @id @default(cuid())
+  userId             String
+  user               User                @relation(fields: [userId], references: [id])
+  tierId             String
+  tier               SubscriptionTier    @relation(fields: [tierId], references: [id])
+  status             SubscriptionStatus  @default(ACTIVE)
+  startedAt          DateTime            @default(now())
+  expiresAt          DateTime
+  autoRenew          Boolean             @default(true)
+  lastResetAt        DateTime            @default(now())
+  examsTakenThisPeriod Int               @default(0)
+  modulesAccessedThisPeriod Int          @default(0)
+
+  // Relations
+  payments           Payment[]
+  moduleAccess       SubscriptionModuleAccess[]
+
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([tierId])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id            String          @id @default(cuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id])
+  subscriptionId String?
+  subscription  Subscription?   @relation(fields: [subscriptionId], references: [id])
+  provider      PaymentProvider @default(FLUTTERWAVE)
+  amountCents   Int
+  currency      String          @default("USD")
+  status        PaymentStatus   @default(PENDING)
+  txRef         String          @unique
+  flwRef        String?
+  raw           Json?
+  metadata      Json?
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("payments")
+}
+
+model SubscriptionModuleAccess {
+  id              String        @id @default(cuid())
+  subscriptionId  String
+  subscription    Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  moduleId        String
+  accessedAt      DateTime      @default(now())
+
+  @@unique([subscriptionId, moduleId])
+  @@index([subscriptionId])
+  @@map("subscription_module_access")
 }
 
 enum StepType {

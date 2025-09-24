@@ -188,13 +188,7 @@ export default function ResultsPage() {
     console.log('Exporting results...');
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // Don't block the whole page while loading; render shell and skeletons below
 
   const uniqueSubjects = Array.from(new Set(results.map(r => r.exam.subject)));
   const uniqueGrades = Array.from(new Set(results.map(r => r.grade).filter(Boolean)));
@@ -225,7 +219,7 @@ export default function ResultsPage() {
       </div>
 
       {/* Statistics Cards */}
-      {statistics && (
+      {(!loading && statistics) && (
         <div className="grid gap-4 md:grid-cols-4 mb-8">
           <Card>
             <CardHeader className="pb-2">
@@ -353,7 +347,25 @@ export default function ResultsPage() {
       </Card>
 
       {/* Results Table/Cards */}
-      {filteredResults.length === 0 ? (
+      {loading ? (
+        <div className="grid gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="border">
+              <CardContent className="p-6">
+                <div className="animate-pulse space-y-4">
+                  <div className="h-5 bg-gray-200 rounded w-1/3"></div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[...Array(4)].map((_, j) => (
+                      <div key={j} className="h-4 bg-gray-200 rounded"></div>
+                    ))}
+                  </div>
+                  <div className="h-8 bg-gray-200 rounded w-40"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filteredResults.length === 0 ? (
         <Card>
           <CardContent className="p-8">
             <div className="text-center">
