@@ -1,0 +1,21 @@
+{
+  "name": "e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for Home Schooling Exam System",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test-runner.js",
+    "test:auth": "node tests/auth/test-all-logins.js",
+    "test:exams": "node tests/exams/test-all-exam-endpoints.js",
+    "test:modules": "node tests/modules/test-all-module-endpoints.js",
+    "test:students": "node tests/students/test-student-management.js",
+    "test:assignments": "node tests/assignments/test-assignment-flow.js",
+    "test:all": "node test-all-endpoints.js",
+    "test:report": "node generate-report.js"
+  },
+  "dependencies": {
+    "puppeteer": "^21.7.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1"
+  }
+}

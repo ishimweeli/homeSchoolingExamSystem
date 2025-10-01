@@ -1,47 +1,77 @@
 version: '3.8'
 
 services:
-  # Next.js Application (using Neon database from .env.local)
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "3001:3001"
-    env_file:
-      - .env.local  # Use your existing local environment file
-    environment:
-      - NODE_ENV=production
-      # Override NEXTAUTH_URL for Docker container access
-      - NEXTAUTH_URL=http://localhost:3001
-    networks:
-      - app-network
-    volumes:
-      - ./uploads:/app/uploads
-      - ./.env.local:/app/.env.local:ro  # Mount env file as read-only
-    command: >
-      sh -c "
-        npx prisma db push &&
-        npx prisma db seed &&
-        node server.js
-      "
-
-  # Redis (Optional - for session storage and caching)
+  # Redis Cache
   redis:
     image: redis:7-alpine
+    container_name: homeschool-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis-data:/data
     networks:
-      - app-network
+      - homeschool-network
     command: redis-server --appendonly yes
 
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: homeschool-backend
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 5000
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      FLUTTERWAVE_PUBLIC_KEY: ${FLUTTERWAVE_PUBLIC_KEY}
+      FLUTTERWAVE_SECRET_KEY: ${FLUTTERWAVE_SECRET_KEY}
+      FLUTTERWAVE_ENCRYPTION_KEY: ${FLUTTERWAVE_ENCRYPTION_KEY}
+      FLUTTERWAVE_WEBHOOK_SECRET: ${FLUTTERWAVE_WEBHOOK_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5001}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./uploads:/app/uploads
+    networks:
+      - homeschool-network
+    command: >
+      sh -c "
+        npx prisma migrate deploy &&
+        npm start
+      "
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api}
+    container_name: homeschool-frontend
+    restart: unless-stopped
+    ports:
+      - "5001:80"
+    depends_on:
+      - backend
+    networks:
+      - homeschool-network
+
 volumes:
-  redis_data:
+  redis-data:
 
 networks:
-  app-network:
+  homeschool-network:
     driver: bridge

@@ -1,0 +1,253 @@
+import React, { useState, useEffect } from 'react';
+import {
+  BookOpen, Users, FileText, Brain, BarChart3, Settings,
+  LogOut, Menu, X, Home, Plus, Calendar, Award, TrendingUp,
+  Clock, CheckCircle, AlertCircle, Sparkles, User, GraduationCap,
+  BookMarked, Activity, Target, Zap, Search, Filter, ChevronRight,
+  Edit, Trash2, Eye, Download, Upload, RefreshCw, ArrowUp, ArrowDown,
+  PenTool, UserPlus, FolderOpen, MoreVertical
+} from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
+
+// Local type used only for role-based UI rendering
+interface UserShape {
+  id: string;
+  name: string;
+  email: string;
+  role: 'STUDENT' | 'TEACHER' | 'PARENT' | 'ADMIN';
+  avatar?: string;
+}
+
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+export default function Layout({ children }: LayoutProps) {
+  const { user: authUser, isAuthenticated, fetchProfile, logout } = useAuthStore();
+  const user = (authUser as unknown as UserShape) || null;
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    ensureUser();
+  }, []);
+
+  const ensureUser = async () => {
+    if (!isAuthenticated || !authUser) {
+      try {
+        await fetchProfile();
+      } catch (_) {
+        navigate('/login');
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const sidebarItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/dashboard', roles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'] },
+    { id: 'exams', label: 'Exams', icon: FileText, path: '/exams', roles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'] },
+    { id: 'modules', label: 'Study Modules', icon: BookOpen, path: '/modules', roles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'] },
+    { id: 'students', label: 'Students', icon: Users, path: '/students', roles: ['TEACHER', 'PARENT', 'ADMIN'] },
+    { id: 'ai-tools', label: 'AI Tools', icon: Brain, path: '/ai-tools', roles: ['TEACHER', 'ADMIN'] },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics', roles: ['TEACHER', 'PARENT', 'ADMIN'] },
+    { id: 'admin-tiers', label: 'Admin', icon: Settings, path: '/admin/tiers', roles: ['ADMIN'] },
+    { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', roles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'] },
+  ];
+
+  const filteredSidebarItems = sidebarItems.filter(item =>
+    item.roles.includes(user?.role || 'STUDENT')
+  );
+
+  const isActiveRoute = (path: string) => {
+    if (path === '/dashboard') {
+      return location.pathname === '/dashboard';
+    }
+    return location.pathname.startsWith(path);
+  };
+
+  // Derive current page title from active route
+  const currentItem = sidebarItems.find(item => isActiveRoute(item.path));
+  const pageTitle = currentItem?.label || 'Dashboard';
+
+  const canCreate = user?.role === 'TEACHER' || user?.role === 'ADMIN';
+
+  const handleRefresh = () => {
+    try {
+      // Simple full refresh to re-fetch page data
+      window.location.reload();
+    } catch (_) {
+      // no-op
+    }
+  };
+
+  const handlePrimaryAction = () => {
+    if (location.pathname.startsWith('/exams')) {
+      navigate('/exams/create');
+      return;
+    }
+    if (location.pathname.startsWith('/modules')) {
+      navigate('/modules/create');
+      return;
+    }
+    if (location.pathname.startsWith('/students')) {
+      navigate('/students');
+      return;
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Sidebar */}
+      <div className={`${sidebarOpen ? 'w-72' : 'w-20'} bg-white shadow-xl transition-all duration-300 flex flex-col border-r border-gray-200`}>
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className={`flex items-center ${!sidebarOpen && 'justify-center'}`}>
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                <GraduationCap className="w-7 h-7 text-white" />
+              </div>
+              {sidebarOpen && (
+                <div className="ml-3">
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                    EduSystem
+                  </h1>
+                  <p className="text-xs text-gray-500">Learning Platform</p>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              {sidebarOpen ? <X className="w-5 h-5 text-gray-600" /> : <Menu className="w-5 h-5 text-gray-600" />}
+            </button>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-4 overflow-y-auto">
+          <ul className="space-y-2">
+            {filteredSidebarItems.map(item => {
+              const Icon = item.icon;
+              const isActive = isActiveRoute(item.path);
+              
+              return (
+                <li key={item.id}>
+                  <button
+                    onClick={() => navigate(item.path)}
+                    className={`w-full flex items-center ${!sidebarOpen ? 'justify-center' : ''} px-4 py-3 rounded-xl transition-all duration-200 group ${
+                      isActive
+                        ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-purple-600'
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-purple-600'}`} />
+                    {sidebarOpen && (
+                      <span className={`ml-3 font-medium ${isActive ? 'text-white' : ''}`}>
+                        {item.label}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Quick Actions - only show for teachers/admins */}
+          {(user?.role === 'TEACHER' || user?.role === 'ADMIN') && sidebarOpen && (
+            <div className="mt-8">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                Quick Actions
+              </h3>
+              <div className="space-y-2">
+                <button
+                  onClick={() => navigate('/exams/create')}
+                  className="w-full flex items-center px-4 py-2.5 text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-600 rounded-lg transition-colors"
+                >
+                  <Plus className="w-4 h-4 mr-3" />
+                  Create Exam
+                </button>
+                <button
+                  onClick={() => navigate('/modules/create')}
+                  className="w-full flex items-center px-4 py-2.5 text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-600 rounded-lg transition-colors"
+                >
+                  <BookOpen className="w-4 h-4 mr-3" />
+                  Create Module
+                </button>
+                <button
+                  onClick={() => navigate('/students')}
+                  className="w-full flex items-center px-4 py-2.5 text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-600 rounded-lg transition-colors"
+                >
+                  <UserPlus className="w-4 h-4 mr-3" />
+                  Manage Students
+                </button>
+              </div>
+            </div>
+          )}
+        </nav>
+
+        <div className="p-4 border-t border-gray-200">
+          <div className={`flex items-center ${!sidebarOpen ? 'justify-center' : ''} mb-4`}>
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center">
+              <User className="w-5 h-5 text-purple-600" />
+            </div>
+            {sidebarOpen && (
+              <div className="ml-3">
+                <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
+                <p className="text-xs text-gray-500 capitalize">{user?.role?.toLowerCase()}</p>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleLogout}
+            className={`w-full flex items-center ${!sidebarOpen ? 'justify-center' : ''} px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium`}
+          >
+            <LogOut className="w-5 h-5" />
+            {sidebarOpen && <span className="ml-3">Logout</span>}
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto">
+        {/* Top Header Bar */}
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200">
+          <div className="px-6 py-4 flex items-center justify-between">
+            <div className="min-w-0">
+              <div className="text-xs text-gray-500">Mwalimu Tools</div>
+              <h2 className="text-lg md:text-xl font-semibold text-gray-900 truncate">{pageTitle}</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleRefresh}
+                className="p-2.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                aria-label="refresh"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              {canCreate && (location.pathname.startsWith('/exams') || location.pathname.startsWith('/modules')) && (
+                <button
+                  onClick={handlePrimaryAction}
+                  className="px-3 md:px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 text-sm font-medium"
+                >
+                  <span className="hidden md:inline">Create</span>
+                  <span className="md:hidden">+
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Page Content */}
+        <div className="p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}

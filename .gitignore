@@ -56,3 +56,42 @@ prisma/migrations/
 
 # OS
 Thumbs.db
+
+# Monorepo additions
+# Dependencies in subpackages
+backend/node_modules/
+frontend/node_modules/
+e2e-tests/node_modules/
+
+# Build outputs
+backend/dist/
+frontend/dist/
+dist/
+dist-ssr/
+build/
+
+# Logs
+logs/
+backend/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Coverage and test outputs
+coverage/
+e2e-tests/screenshots/
+e2e-tests/screenshots-*/
+e2e-tests/reports/
+
+# Caches
+.turbo/
+.cache/
+
+# Environment files (keep examples tracked)
+.env
+.env.*
+!.env.example
+!*/.env.example

@@ -1,0 +1,379 @@
+{
+  "timestamp": "2025-09-28T15:08:27.511Z",
+  "environment": {
+    "frontend": "http://localhost:5002",
+    "backend": "http://localhost:5000"
+  },
+  "endpoints": [
+    {
+      "name": "POST /auth/register - New Parent Registration",
+      "endpoint": "/auth/register",
+      "method": "POST",
+      "expectedStatus": 200,
+      "actualStatus": 400,
+      "success": false,
+      "response": {
+        "success": false,
+        "message": "User already exists with this email or username"
+      },
+      "timestamp": "2025-09-28T15:08:31.050Z"
+    },
+    {
+      "name": "POST /auth/login - Login with Email",
+      "endpoint": "/auth/login",
+      "method": "POST",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "message": "Login successful",
+        "data": {
+          "user": {
+            "id": "cmeqs8ewa00019d9ezqu7avod",
+            "email": "teacher@test.com",
+            "name": "Updated Teacher Name",
+            "role": "TEACHER",
+            "username": "teacher_updated"
+          },
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZXFzOGV3YTAwMDE5ZDllenF1N2F2b2QiLCJlbWFpbCI6InRlYWNoZXJAdGVzdC5jb20iLCJyb2xlIjoiVEVBQ0hFUiIsImlhdCI6MTc1OTA3MjExMiwiZXhwIjoxNzU5MDc1NzEyfQ.utrCPi6MU0atsats45z7V5SAnr5ZHey-x0i3yioCWkQ",
+          "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZXFzOGV3YTAwMDE5ZDllenF1N2F2b2QiLCJpYXQiOjE3NTkwNzIxMTIsImV4cCI6MTc1OTY3NjkxMn0.xR-nFH7kjBV3_W5WGu9i1nFlwtq6BbEy8ElwkFr0qvs"
+        }
+      },
+      "timestamp": "2025-09-28T15:08:32.135Z"
+    },
+    {
+      "name": "POST /auth/login - Login with Username",
+      "endpoint": "/auth/login",
+      "method": "POST",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "message": "Login successful",
+        "data": {
+          "user": {
+            "id": "cmeqs8hfy00049d9ez39zw3fk",
+            "email": "student@test.com",
+            "name": "Student User",
+            "role": "STUDENT",
+            "username": "student_test"
+          },
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZXFzOGhmeTAwMDQ5ZDllejM5enczZmsiLCJlbWFpbCI6InN0dWRlbnRAdGVzdC5jb20iLCJyb2xlIjoiU1RVREVOVCIsImlhdCI6MTc1OTA3MjExMiwiZXhwIjoxNzU5MDc1NzEyfQ.IL_oz6LsJXhU1h8v5MHRm_JKxylq1rHGyTidVc1xoLA",
+          "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZXFzOGhmeTAwMDQ5ZDllejM5enczZmsiLCJpYXQiOjE3NTkwNzIxMTIsImV4cCI6MTc1OTY3NjkxMn0.XjLGuBDQp83HYiBZeWH-TAqZiQF36NQI4WhuLtON0AU"
+        }
+      },
+      "timestamp": "2025-09-28T15:08:32.992Z"
+    },
+    {
+      "name": "POST /auth/login - Invalid Credentials",
+      "endpoint": "/auth/login",
+      "method": "POST",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "success": true,
+      "response": {
+        "success": false,
+        "message": "Invalid credentials"
+      },
+      "timestamp": "2025-09-28T15:08:33.227Z"
+    },
+    {
+      "name": "GET /auth/me - Get Current User",
+      "endpoint": "/auth/me",
+      "method": "GET",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "data": {
+          "id": "cmeqs8ewa00019d9ezqu7avod",
+          "email": "teacher@test.com",
+          "username": "teacher_updated",
+          "name": "Updated Teacher Name",
+          "role": "TEACHER",
+          "image": null,
+          "createdAt": "2025-08-25T07:15:05.194Z",
+          "lastLogin": "2025-09-28T15:08:31.615Z",
+          "isActive": true,
+          "_count": {
+            "createdExams": 8,
+            "createdStudyModules": 3,
+            "examAttempts": 0,
+            "studyAssignments": 0
+          }
+        }
+      },
+      "timestamp": "2025-09-28T15:08:34.242Z"
+    },
+    {
+      "name": "GET /auth/profile - Get Profile",
+      "endpoint": "/auth/profile",
+      "method": "GET",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "data": {
+          "id": "cmeqs8ewa00019d9ezqu7avod",
+          "email": "teacher@test.com",
+          "name": "Updated Teacher Name",
+          "username": "teacher_updated",
+          "role": "TEACHER",
+          "createdAt": "2025-08-25T07:15:05.194Z",
+          "lastLogin": "2025-09-28T15:08:31.615Z",
+          "subscriptions": []
+        }
+      },
+      "timestamp": "2025-09-28T15:08:35.464Z"
+    },
+    {
+      "name": "PUT /auth/profile - Update Profile",
+      "endpoint": "/auth/profile",
+      "method": "PUT",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "message": "Profile updated successfully",
+        "data": {
+          "id": "cmeqs8ewa00019d9ezqu7avod",
+          "email": "teacher@test.com",
+          "name": "Updated Teacher Name",
+          "username": "teacher_updated",
+          "role": "TEACHER"
+        }
+      },
+      "timestamp": "2025-09-28T15:08:36.677Z"
+    },
+    {
+      "name": "POST /auth/forgot-password - Request Password Reset",
+      "endpoint": "/auth/forgot-password",
+      "method": "POST",
+      "expectedStatus": 200,
+      "actualStatus": 400,
+      "success": false,
+      "response": {
+        "success": false,
+        "message": "Unable to process request"
+      },
+      "timestamp": "2025-09-28T15:08:37.447Z"
+    },
+    {
+      "name": "POST /auth/refresh - Refresh Token",
+      "endpoint": "/auth/refresh",
+      "method": "POST",
+      "expectedStatus": 400,
+      "actualStatus": 401,
+      "success": false,
+      "response": {
+        "success": false,
+        "message": "Invalid refresh token"
+      },
+      "timestamp": "2025-09-28T15:08:37.453Z"
+    },
+    {
+      "name": "GET /users/students - List Parent Students",
+      "endpoint": "/users/students",
+      "method": "GET",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "data": [
+          {
+            "id": "cmg3rflcu0001k38vrn0pu5w2",
+            "name": "Test Student 1759067601737",
+            "username": "test_student_1759067601737",
+            "role": "STUDENT",
+            "createdAt": "2025-09-28T13:53:23.118Z"
+          },
+          {
+            "id": "cmffwuurn001fl2v6wo8jy041",
+            "name": "Test Student1757625490923",
+            "username": "student_1757625490923",
+            "role": "STUDENT",
+            "createdAt": "2025-09-11T21:18:45.059Z"
+          },
+          {
+            "id": "cmffwppq50001l2v6y6seresz",
+            "name": "ishimwe 1 eliab",
+            "username": "eliab11",
+            "role": "STUDENT",
+            "createdAt": "2025-09-11T21:14:45.244Z"
+          },
+          {
+            "id": "cmf2ysp9r0001hy1vga2vw0av",
+            "name": "eliab ishimwe",
+            "username": "eliab",
+            "role": "STUDENT",
+            "createdAt": "2025-09-02T19:52:03.567Z"
+          },
+          {
+            "id": "cmeqs8hfy00049d9ez39zw3fk",
+            "name": "Student User",
+            "username": "student_test",
+            "role": "STUDENT",
+            "createdAt": "2025-08-25T07:15:08.494Z"
+          }
+        ]
+      },
+      "timestamp": "2025-09-28T15:08:38.271Z"
+    },
+    {
+      "name": "POST /users/students - Parent Creates Student",
+      "endpoint": "/users/students",
+      "method": "POST",
+      "expectedStatus": 200,
+      "actualStatus": 400,
+      "success": false,
+      "response": {
+        "success": false,
+        "message": "Username already taken"
+      },
+      "timestamp": "2025-09-28T15:08:39.004Z"
+    },
+    {
+      "name": "GET /users/students - Unauthorized Access",
+      "endpoint": "/users/students",
+      "method": "GET",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "success": true,
+      "response": {
+        "success": false,
+        "message": "Authentication token is required"
+      },
+      "timestamp": "2025-09-28T15:08:39.007Z"
+    },
+    {
+      "name": "POST /auth/login - Student Login for Role Test",
+      "endpoint": "/auth/login",
+      "method": "POST",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "message": "Login successful",
+        "data": {
+          "user": {
+            "id": "cmeqs8hfy00049d9ez39zw3fk",
+            "email": "student@test.com",
+            "name": "Student User",
+            "role": "STUDENT",
+            "username": "student_test"
+          },
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZXFzOGhmeTAwMDQ5ZDllejM5enczZmsiLCJlbWFpbCI6InN0dWRlbnRAdGVzdC5jb20iLCJyb2xlIjoiU1RVREVOVCIsImlhdCI6MTc1OTA3MjExOSwiZXhwIjoxNzU5MDc1NzE5fQ.VLnPlWcn2fvM1yDxHfoGrPOuVija7t5OUCMPCIXv-6g",
+          "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZXFzOGhmeTAwMDQ5ZDllejM5enczZmsiLCJpYXQiOjE3NTkwNzIxMTksImV4cCI6MTc1OTY3NjkxOX0.t3IvTeZiMJT6Eypi2s-nzgCfK1ks_nw19EPeoGUCr8Q"
+        }
+      },
+      "timestamp": "2025-09-28T15:08:39.641Z"
+    },
+    {
+      "name": "POST /users/students - Student Cannot Create Student",
+      "endpoint": "/users/students",
+      "method": "POST",
+      "expectedStatus": 403,
+      "actualStatus": 403,
+      "success": true,
+      "response": {
+        "success": false,
+        "message": "Insufficient permissions"
+      },
+      "timestamp": "2025-09-28T15:08:39.888Z"
+    },
+    {
+      "name": "POST /auth/logout - Logout",
+      "endpoint": "/auth/logout",
+      "method": "POST",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "message": "Logged out successfully"
+      },
+      "timestamp": "2025-09-28T15:09:13.450Z"
+    }
+  ],
+  "summary": {
+    "total": 21,
+    "passed": 14,
+    "failed": 7,
+    "skipped": 0
+  },
+  "detailedResults": [
+    {
+      "name": "Teacher Login Flow",
+      "type": "ui_flow",
+      "success": false,
+      "duration": 7640,
+      "error": "Waiting for selector `button[type=\"submit\"], button:contains(\"Login\"), button:contains(\"Sign in\")` failed: Waiting failed: 5000ms exceeded",
+      "screenshots": [
+        "e2e-tests\\screenshots\\1759072128706-Teacher-Login-Flow-error.png"
+      ],
+      "timestamp": "2025-09-28T15:08:48.952Z"
+    },
+    {
+      "name": "Parent Registration Flow",
+      "type": "ui_flow",
+      "success": true,
+      "duration": 4775,
+      "error": null,
+      "screenshots": [
+        "e2e-tests\\screenshots\\1759072129737-register-page.png",
+        "e2e-tests\\screenshots\\1759072130319-register-filled.png",
+        "e2e-tests\\screenshots\\1759072133547-register-result.png"
+      ],
+      "timestamp": "2025-09-28T15:08:53.727Z"
+    },
+    {
+      "name": "Parent Creates Student Account",
+      "type": "ui_flow",
+      "success": false,
+      "duration": 11139,
+      "error": "Navigation timeout of 10000 ms exceeded",
+      "screenshots": [
+        "e2e-tests\\screenshots\\1759072144728-Parent-Creates-Student-Account-error.png"
+      ],
+      "timestamp": "2025-09-28T15:09:04.867Z"
+    },
+    {
+      "name": "Student Login with Parent-Created Account",
+      "type": "ui_flow",
+      "success": false,
+      "duration": 6410,
+      "error": "Waiting for selector `button[type=\"submit\"], button:contains(\"Login\"), button:contains(\"Sign in\")` failed: Waiting failed: 5000ms exceeded",
+      "screenshots": [
+        "e2e-tests\\screenshots\\1759072151066-Student-Login-with-Parent-Created-Account-error.png"
+      ],
+      "timestamp": "2025-09-28T15:09:11.277Z"
+    },
+    {
+      "name": "OAuth2 Google Login Flow (UI)",
+      "type": "ui_flow",
+      "success": true,
+      "duration": 880,
+      "error": null,
+      "screenshots": [
+        "e2e-tests\\screenshots\\1759072152010-oauth-login-page.png"
+      ],
+      "timestamp": "2025-09-28T15:09:12.158Z"
+    },
+    {
+      "name": "Logout Flow",
+      "type": "ui_flow",
+      "success": true,
+      "duration": 710,
+      "error": null,
+      "screenshots": [],
+      "timestamp": "2025-09-28T15:09:12.868Z"
+    }
+  ]
+}

@@ -37,7 +37,16 @@
       "Bash(winget install:*)",
       "Bash(git pull:*)",
       "Bash(mkdir:*)",
-      "Bash(where docker)"
+      "Bash(where docker)",
+      "Bash(python:*)",
+      "Bash(npm:*)",
+      "Read(//c/Users/EliIs/Downloads/**)",
+      "mcp__ide__getDiagnostics",
+      "Bash(tree:*)",
+      "Bash(echo:*)",
+      "Bash(npx tsc:*)",
+      "Bash(touch:*)",
+      "Bash(npx vite:*)"
     ],
     "deny": [],
     "ask": []

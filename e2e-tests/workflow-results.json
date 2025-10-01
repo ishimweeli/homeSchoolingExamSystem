@@ -1,0 +1,81 @@
+{
+  "timestamp": "2025-09-28T18:09:30.754Z",
+  "tests": [
+    {
+      "name": "Teacher Workflow",
+      "status": "failed",
+      "error": "Failed to execute 'querySelectorAll' on 'Document': 'a[href*=\"exam\"], button:has-text(\"Exams\")' is not a valid selector."
+    },
+    {
+      "name": "Parent Workflow",
+      "status": "failed",
+      "error": "Failed to execute 'querySelectorAll' on 'Document': 'a[href*=\"children\"], button:has-text(\"Children\")' is not a valid selector."
+    },
+    {
+      "name": "Student Workflow",
+      "status": "passed"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "Teacher-login-page",
+      "filename": "e2e-tests/screenshots-workflow/1759082981649-Teacher-login-page.png"
+    },
+    {
+      "name": "Teacher-credentials-entered",
+      "filename": "e2e-tests/screenshots-workflow/1759082982238-Teacher-credentials-entered.png"
+    },
+    {
+      "name": "Teacher-after-login",
+      "filename": "e2e-tests/screenshots-workflow/1759082987619-Teacher-after-login.png"
+    },
+    {
+      "name": "teacher-dashboard",
+      "filename": "e2e-tests/screenshots-workflow/1759082987866-teacher-dashboard.png"
+    },
+    {
+      "name": "Parent-login-page",
+      "filename": "e2e-tests/screenshots-workflow/1759082989469-Parent-login-page.png"
+    },
+    {
+      "name": "Parent-credentials-entered",
+      "filename": "e2e-tests/screenshots-workflow/1759082989931-Parent-credentials-entered.png"
+    },
+    {
+      "name": "Parent-after-login",
+      "filename": "e2e-tests/screenshots-workflow/1759082993472-Parent-after-login.png"
+    },
+    {
+      "name": "parent-dashboard",
+      "filename": "e2e-tests/screenshots-workflow/1759082993721-parent-dashboard.png"
+    },
+    {
+      "name": "Student-login-page",
+      "filename": "e2e-tests/screenshots-workflow/1759082995249-Student-login-page.png"
+    },
+    {
+      "name": "Student-credentials-entered",
+      "filename": "e2e-tests/screenshots-workflow/1759082995719-Student-credentials-entered.png"
+    },
+    {
+      "name": "Student-after-login",
+      "filename": "e2e-tests/screenshots-workflow/1759082998745-Student-after-login.png"
+    },
+    {
+      "name": "student-dashboard",
+      "filename": "e2e-tests/screenshots-workflow/1759082998942-student-dashboard.png"
+    },
+    {
+      "name": "student-exams",
+      "filename": "e2e-tests/screenshots-workflow/1759083001332-student-exams.png"
+    },
+    {
+      "name": "student-study",
+      "filename": "e2e-tests/screenshots-workflow/1759083002593-student-study.png"
+    }
+  ],
+  "summary": {
+    "passed": 1,
+    "failed": 2
+  }
+}
