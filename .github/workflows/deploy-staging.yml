@@ -1,0 +1,104 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Staging Server
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSPHRASE }}
+        run: |
+          sshpass -e ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOFMARKER'
+          set -e
+
+          echo "🚀 Starting staging deployment..."
+
+          # Navigate to app directory
+          cd /opt/homeschool-app-staging || mkdir -p /opt/homeschool-app-staging && cd /opt/homeschool-app-staging
+
+          # Clone or pull latest code
+          if [ -d ".git" ]; then
+            echo "📦 Pulling latest changes from staging branch..."
+            git fetch origin
+            git checkout staging
+            git pull origin staging
+          else
+            echo "📦 Cloning repository..."
+            git clone -b staging https://github.com/${{ github.repository }}.git .
+          fi
+
+          # Create .env file with secrets
+          echo "🔐 Creating .env file..."
+          cat > .env << 'ENVEOF'
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          FLUTTERWAVE_PUBLIC_KEY=${{ secrets.FLUTTERWAVE_PUBLIC_KEY }}
+          FLUTTERWAVE_SECRET_KEY=${{ secrets.FLUTTERWAVE_SECRET_KEY }}
+          FLUTTERWAVE_ENCRYPTION_KEY=${{ secrets.FLUTTERWAVE_ENCRYPTION_KEY }}
+          FLUTTERWAVE_WEBHOOK_SECRET=${{ secrets.FLUTTERWAVE_WEBHOOK_SECRET }}
+          SMTP_HOST=${{ secrets.SMTP_HOST }}
+          SMTP_PORT=${{ secrets.SMTP_PORT }}
+          SMTP_USER=${{ secrets.SMTP_USER }}
+          SMTP_PASS=${{ secrets.SMTP_PASS }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          ENVEOF
+
+          # Stop and remove existing containers
+          echo "🛑 Stopping existing containers..."
+          docker-compose -f docker-compose.staging.yml down || true
+
+          # Build and start containers
+          echo "🏗️  Building and starting containers..."
+          docker-compose -f docker-compose.staging.yml up -d --build
+
+          # Clean up old images
+          echo "🧹 Cleaning up old images..."
+          docker image prune -f
+
+          echo "✅ Staging deployment complete!"
+          echo "📊 Container status:"
+          docker-compose -f docker-compose.staging.yml ps
+
+          echo ""
+          echo "🌐 Staging application is available at:"
+          echo "   Frontend: http://${{ secrets.SERVER_IP }}:5003"
+          echo "   Backend API: http://${{ secrets.SERVER_IP }}:5002"
+
+          # Force exit to close SSH session
+          exit 0
+          EOFMARKER
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ Staging deployment succeeded"
+          else
+            echo "❌ Staging deployment failed"
+            exit 1
+          fi

@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: homeschool-redis-production
+    restart: unless-stopped
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - homeschool-network
+    command: redis-server --appendonly yes
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: homeschool-backend-production
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgresql://neondb_owner:npg_wPT5x7MgmZVv@ep-raspy-dew-a85w6sl0-pooler.eastus2.azure.neon.tech/neondb?sslmode=require
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_EXPIRES_IN: 1h
+      JWT_REFRESH_EXPIRES_IN: 7d
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: gpt-4o-mini
+      FLUTTERWAVE_PUBLIC_KEY: ${FLUTTERWAVE_PUBLIC_KEY}
+      FLUTTERWAVE_SECRET_KEY: ${FLUTTERWAVE_SECRET_KEY}
+      FLUTTERWAVE_ENCRYPTION_KEY: ${FLUTTERWAVE_ENCRYPTION_KEY}
+      FLUTTERWAVE_WEBHOOK_SECRET: ${FLUTTERWAVE_WEBHOOK_SECRET}
+      FLUTTERWAVE_REDIRECT_URL: http://YOUR_PRODUCTION_SERVER_IP:5005/payment/callback
+      FLUTTERWAVE_CURRENCY: RWF
+      FRONTEND_URL: http://YOUR_PRODUCTION_SERVER_IP:5005
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    ports:
+      - "5004:5000"
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./uploads:/app/uploads
+    networks:
+      - homeschool-network
+    command: >
+      sh -c "
+        npx prisma migrate deploy &&
+        npm start
+      "
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://YOUR_PRODUCTION_SERVER_IP:5004/api
+    container_name: homeschool-frontend-production
+    restart: unless-stopped
+    ports:
+      - "5005:80"
+    depends_on:
+      - backend
+    networks:
+      - homeschool-network
+
+volumes:
+  redis-data:
+
+networks:
+  homeschool-network:
+    driver: bridge
