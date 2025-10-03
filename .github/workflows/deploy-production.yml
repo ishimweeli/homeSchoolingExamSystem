@@ -48,32 +48,27 @@ jobs:
             git clone -b production https://github.com/${{ github.repository }}.git .
           fi
 
-          # Create .env file with secrets
-          echo "🔐 Creating .env file..."
-          cat > .env << 'ENVEOF'
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          FLUTTERWAVE_PUBLIC_KEY=${{ secrets.FLUTTERWAVE_PUBLIC_KEY }}
-          FLUTTERWAVE_SECRET_KEY=${{ secrets.FLUTTERWAVE_SECRET_KEY }}
-          FLUTTERWAVE_ENCRYPTION_KEY=${{ secrets.FLUTTERWAVE_ENCRYPTION_KEY }}
-          FLUTTERWAVE_WEBHOOK_SECRET=${{ secrets.FLUTTERWAVE_WEBHOOK_SECRET }}
-          SMTP_HOST=${{ secrets.SMTP_HOST }}
-          SMTP_PORT=${{ secrets.SMTP_PORT }}
-          SMTP_USER=${{ secrets.SMTP_USER }}
-          SMTP_PASS=${{ secrets.SMTP_PASS }}
-          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-          ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-          ENVEOF
-
           # Stop and remove existing containers
           echo "🛑 Stopping existing containers..."
           docker-compose -f docker-compose.production.yml down || true
 
-          # Build and start containers
+          # Build and start containers with secrets
           echo "🏗️  Building and starting containers..."
+          JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+          JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
+          OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+          FLUTTERWAVE_PUBLIC_KEY="${{ secrets.FLUTTERWAVE_PUBLIC_KEY }}" \
+          FLUTTERWAVE_SECRET_KEY="${{ secrets.FLUTTERWAVE_SECRET_KEY }}" \
+          FLUTTERWAVE_ENCRYPTION_KEY="${{ secrets.FLUTTERWAVE_ENCRYPTION_KEY }}" \
+          FLUTTERWAVE_WEBHOOK_SECRET="${{ secrets.FLUTTERWAVE_WEBHOOK_SECRET }}" \
+          SMTP_HOST="${{ secrets.SMTP_HOST }}" \
+          SMTP_PORT="${{ secrets.SMTP_PORT }}" \
+          SMTP_USER="${{ secrets.SMTP_USER }}" \
+          SMTP_PASS="${{ secrets.SMTP_PASS }}" \
+          GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+          GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+          ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" \
+          ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
           docker-compose -f docker-compose.production.yml up -d --build
 
           # Clean up old images
