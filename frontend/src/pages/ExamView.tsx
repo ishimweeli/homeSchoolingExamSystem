@@ -42,9 +42,25 @@ export default function ExamView() {
         }
         if (!id) return;
         const data = await api.getExam(id);
+        // Parse options if they're JSON strings
+        if (data.questions) {
+          data.questions = data.questions.map((q: any) => {
+            try {
+              return {
+                ...q,
+                options: q.options && typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+                correctAnswer: q.correctAnswer && typeof q.correctAnswer === 'string' ? JSON.parse(q.correctAnswer) : q.correctAnswer,
+              };
+            } catch (parseError) {
+              console.error('Error parsing question:', q, parseError);
+              return q; // Return unparsed if error
+            }
+          });
+        }
         setExam(data);
       } catch (e: any) {
-        setError(e?.response?.data?.message || 'Failed to load exam');
+        console.error('Error loading exam:', e);
+        setError(e?.response?.data?.message || e?.message || 'Failed to load exam');
       } finally {
         setLoading(false);
       }
@@ -62,9 +78,14 @@ export default function ExamView() {
   if (error || !exam) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">
-          {error || 'Exam not found'}
-          <button className="ml-3 text-purple-600" onClick={() => navigate(-1)}>Go back</button>
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">{error || 'Exam not found'}</p>
+          <button 
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700" 
+            onClick={() => navigate('/exams')}
+          >
+            Go back to Exams
+          </button>
         </div>
       </div>
     );
@@ -83,8 +104,8 @@ export default function ExamView() {
               Total {exam.totalMarks} marks • Pass {exam.passingMarks}
             </p>
           </div>
-          <button onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50">Back to Dashboard</button>
+          <button onClick={() => navigate('/exams')}
+            className="px-4 py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50">Back to Exams</button>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
@@ -99,12 +120,24 @@ export default function ExamView() {
                 <div className="font-medium text-gray-900">{q.question}</div>
                 {Array.isArray(q.options) && q.options.length > 0 && (
                   <ul className="mt-3 space-y-2">
-                    {q.options.map((opt, i) => (
-                      <li key={i} className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded border border-gray-300 inline-block" />
-                        <span className="text-gray-700">{opt}</span>
-                      </li>
-                    ))}
+                    {q.options.map((opt, i) => {
+                      // Handle MATCHING type with {active, passive} objects
+                      if (typeof opt === 'object' && opt !== null && 'active' in opt && 'passive' in opt) {
+                        return (
+                          <li key={i} className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded border border-gray-300 inline-block" />
+                            <span className="text-gray-700">{opt.active} → {opt.passive}</span>
+                          </li>
+                        );
+                      }
+                      // Handle string options
+                      return (
+                        <li key={i} className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded border border-gray-300 inline-block" />
+                          <span className="text-gray-700">{typeof opt === 'string' ? opt : JSON.stringify(opt)}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
                 <div className="mt-3 text-xs text-gray-500">Marks: {q.marks}</div>

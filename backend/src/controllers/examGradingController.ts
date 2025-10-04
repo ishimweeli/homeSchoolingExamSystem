@@ -1,24 +1,18 @@
 import { Request, Response } from 'express';
 import { prisma } from '../utils/db';
-import OpenAI from 'openai';
-
-const getOpenAI = () => {
-  if (process.env.OPENAI_API_KEY) {
-    return new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
-  return null;
-};
+import { getAIClient, isAIAvailable } from '../utils/aiClient';
 
 export const gradeExamWithAI = async (
   questions: any[],
   answers: Record<string, string>
 ) => {
-  const openaiClient = getOpenAI();
+  if (!isAIAvailable()) {
+    throw new Error('AI client not available - please configure OPENROUTER_API_KEY');
+  }
 
-  if (!openaiClient) {
-    throw new Error('OpenAI client not available');
+  const aiClient = getAIClient();
+  if (!aiClient) {
+    throw new Error('Failed to initialize AI client');
   }
 
   const questionsToGrade = questions.map(q => {
@@ -68,8 +62,8 @@ Respond in JSON format exactly like this:
 ]`;
 
   try {
-    const completion = await openaiClient.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    const completion = await aiClient.chat.completions.create({
+      model: process.env.AI_MODEL || 'openai/gpt-4o-mini',
       messages: [
         {
           role: 'system',
@@ -161,9 +155,7 @@ export const submitExamWithAIGrading = async (req: Request, res: Response) => {
           questionId: question.id,
           answer: studentAnswer,
           finalScore: aiResult.score,
-          aiFeedback: aiResult.feedback,
-          isCorrect: aiResult.status === 'correct',
-          isPartiallyCorrect: aiResult.status === 'partial'
+          aiFeedback: aiResult.feedback
         });
       }
     } catch (aiError) {
@@ -199,9 +191,7 @@ export const submitExamWithAIGrading = async (req: Request, res: Response) => {
           questionId: question.id,
           answer: studentAnswer,
           finalScore: marksAwarded,
-          aiFeedback: isCorrect ? 'Correct answer!' : `Incorrect. Expected: ${correctAnswer}`,
-          isCorrect: isCorrect,
-          isPartiallyCorrect: false
+          aiFeedback: isCorrect ? 'Correct answer!' : `Incorrect. Expected: ${correctAnswer}`
         });
       }
     }

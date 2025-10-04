@@ -1,0 +1,27 @@
+# ============================================
+# ADD TO YOUR backend/.env FILE (SIMPLIFIED!)
+# ============================================
+
+# Your OpenRouter API Key (ONLY key needed!)
+OPENROUTER_API_KEY="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"
+
+# AI Model (switch anytime!)
+AI_MODEL="openai/gpt-4o-mini"
+
+# Site info (optional)
+SITE_URL="https://homeschool-exam.com"
+SITE_NAME="HomeSchool Exam System"
+
+# ============================================
+# NOTES:
+# ============================================
+# - Remove any OPENAI_API_KEY lines
+# - Remove any USE_OPENROUTER lines
+# - Only OpenRouter is used now (simpler!)
+# - Change AI_MODEL to switch providers/models
+# - See SETUP_OPENROUTER.txt for all available models
+
+# Restart server:
+# cd backend
+# npm run dev
+

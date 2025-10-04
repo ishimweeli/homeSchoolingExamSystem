@@ -14,16 +14,19 @@ import Students from './pages/Students'
 import Dashboard from './pages/Dashboard'
 import ExamView from './pages/ExamView'
 import ExamCreate from './pages/ExamCreate'
+import ExamEdit from './pages/ExamEdit'
 import ExamCreateSimple from './pages/ExamCreateSimple'
 import ExamsListSimple from './pages/ExamsListSimple'
-import ExamCreateProfessional from './pages/ExamCreateProfessional'
-import ExamsProfessional from './pages/ExamsProfessional'
+import Exams from './pages/Exams'
+import { ExamTaker } from './components/ExamTaker'
+import ExamResults from './pages/ExamResults'
 import ModuleCreate from './pages/ModuleCreate'
 import ModuleView from './pages/ModuleView'
 import StudyModules from './pages/StudyModules'
 import AITools from './pages/AITools'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
+import Subscription from './pages/Subscription'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminTiers from './pages/AdminTiers'
 
@@ -45,17 +48,21 @@ function App() {
         {/* Protected routes with shared layout */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
-        <Route path="/exams" element={<ProtectedRoute><ExamsProfessional /></ProtectedRoute>} />
+        <Route path="/exams" element={<ProtectedRoute><Exams /></ProtectedRoute>} />
         <Route path="/exams/create" element={<ProtectedRoute><ExamCreate /></ProtectedRoute>} />
         <Route path="/exams/create-simple" element={<ProtectedRoute><ExamCreateSimple /></ProtectedRoute>} />
-        <Route path="/exams/create-professional" element={<ProtectedRoute><ExamCreateProfessional /></ProtectedRoute>} />
+        {/* Consolidated exam creation under /exams/create */}
+        <Route path="/exams/take/:id" element={<ProtectedRoute><ExamTaker /></ProtectedRoute>} />
+        <Route path="/exams/results/:id" element={<ProtectedRoute><ExamResults /></ProtectedRoute>} />
         <Route path="/exams/:id" element={<ProtectedRoute><ExamView /></ProtectedRoute>} />
+        <Route path="/exams/:id/edit" element={<ProtectedRoute><ExamEdit /></ProtectedRoute>} />
         <Route path="/modules" element={<ProtectedRoute><StudyModules /></ProtectedRoute>} />
         <Route path="/modules/create" element={<ProtectedRoute><ModuleCreate /></ProtectedRoute>} />
         <Route path="/modules/:id" element={<ProtectedRoute><ModuleView /></ProtectedRoute>} />
         <Route path="/ai-tools" element={<ProtectedRoute><AITools /></ProtectedRoute>} />
         <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
         <Route path="/admin/tiers" element={<ProtectedRoute><AdminTiers /></ProtectedRoute>} />
       </Routes>
     </Router>

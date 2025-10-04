@@ -1,34 +1,31 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../utils/db';
-import OpenAI from 'openai';
 import { incrementTierUsage } from '../middleware/tierLimits';
-
-let openai: OpenAI | null = null;
-
-const getOpenAI = () => {
-  if (!openai && process.env.OPENAI_API_KEY) {
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
-  return openai;
-};
+import { getAIClient, getAIModel, isAIAvailable, generateExamQuestions } from '../utils/aiClient';
 
 // Validation schemas
 const createExamSchema = z.object({
   title: z.string().min(3),
   subject: z.string(),
   gradeLevel: z.number().min(1).max(12),
-  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']),
+  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional(),
   duration: z.number().min(5),
   questions: z.array(z.object({
-    type: z.enum(['MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER', 'LONG_ANSWER', 'FILL_BLANKS']),
+    type: z.enum(['MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER', 'LONG_ANSWER', 'FILL_BLANKS', 'MATCHING', 'ORDERING', 'MATH_PROBLEM', 'CODING', 'DIAGRAM']),
     question: z.string(),
-    options: z.array(z.string()).optional(),
-    correctAnswer: z.string(),
+    // Allow: string[], array of object (e.g., MATCHING), record, raw string, or null
+    options: z.union([
+      z.array(z.string()),
+      z.array(z.record(z.any())),
+      z.record(z.string()),
+      z.string(),
+      z.null()
+    ]).optional(),
+    correctAnswer: z.union([z.string(), z.array(z.string()), z.record(z.string())]),
     marks: z.number(),
-    explanation: z.string().optional(),
+    explanation: z.string().nullable().optional(),
+    sampleAnswer: z.string().nullable().optional(),
   })),
 });
 
@@ -67,10 +64,12 @@ export const createExam = async (req: Request, res: Response) => {
           create: validatedData.questions.map((q, index) => ({
             type: q.type,
             question: q.question,
-            correctAnswer: JSON.stringify(q.correctAnswer),
+            correctAnswer: typeof q.correctAnswer === 'string' ? q.correctAnswer : JSON.stringify(q.correctAnswer),
             marks: q.marks,
             order: index + 1,
-            options: q.options ? JSON.stringify(q.options) : undefined,
+            options: q.options ? (typeof q.options === 'string' ? q.options : JSON.stringify(q.options)) : undefined,
+            sampleAnswer: q.sampleAnswer || q.explanation || undefined,
+            explanation: q.explanation || undefined,
             difficulty: validatedData.difficulty?.toLowerCase() || 'medium',
           })),
         },
@@ -109,59 +108,25 @@ export const generateExamWithAI = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const openaiClient = getOpenAI();
-    if (!openaiClient) {
-      return res.status(503).json({ success: false, message: 'AI generation is not available. OpenAI API key is missing.' });
+    if (!isAIAvailable()) {
+      return res.status(503).json({ success: false, message: 'AI generation is not available. API key is missing.' });
     }
 
-    // Build prompt for AI
-    const prompt = `Create an exam with the following specifications:
-    - Subject: ${validatedData.subject}
-    - Grade Level: ${validatedData.gradeLevel}
-    - Topics: ${validatedData.topics.join(', ')}
-    - Number of Questions: ${validatedData.questionCount}
-    - Difficulty: ${validatedData.difficulty}
-    - Question Types: ${validatedData.questionTypes?.join(', ') || 'Mix of all types'}
-
-    Generate ${validatedData.questionCount} questions appropriate for grade ${validatedData.gradeLevel}.
-    Include variety in question types. For each question provide:
-    1. The question text
-    2. Options (for multiple choice)
-    3. Correct answer
-    4. Brief explanation
-    5. Marks (based on difficulty: Easy=2, Medium=5, Hard=10)
-
-    Return as JSON array with this structure:
-    [{
-      "type": "MULTIPLE_CHOICE",
-      "question": "...",
-      "options": ["..."],
-      "correctAnswer": "...",
-      "explanation": "...",
-      "marks": 5
-    }]`;
-
-    const completion = await openaiClient.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert educator creating age-appropriate exams. Always return valid JSON.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
+    // Delegate question generation to centralized AI service
+    const questions = await generateExamQuestions({
+      subject: validatedData.subject,
+      gradeLevel: validatedData.gradeLevel,
+      topics: validatedData.topics,
+      questionCount: validatedData.questionCount,
+      difficulty: validatedData.difficulty as any,
+      questionTypes: validatedData.questionTypes,
     });
 
-    const aiResponse = completion.choices[0].message.content;
-    const questions = JSON.parse(aiResponse || '[]');
+    // No server-side normalization or remapping; AI must follow the schema strictly
+    const validatedQuestions = questions;
 
-    // Calculate total marks
-    const totalMarks = questions.reduce((sum: number, q: any) => sum + q.marks, 0);
+    // Calculate total marks (no server-side defaults)
+    const totalMarks = validatedQuestions.reduce((sum: number, q: any) => sum + (typeof q.marks === 'number' ? q.marks : 0), 0);
 
     // Create exam with AI-generated questions
     const exam = await prisma.exam.create({
@@ -175,12 +140,13 @@ export const generateExamWithAI = async (req: Request, res: Response) => {
         creatorId: (req as any).user.id,
         aiGenerated: true,
         questions: {
-          create: questions.map((q: any, index: number) => ({
+          create: validatedQuestions.map((q: any, index: number) => ({
             type: q.type,
             question: q.question,
             options: q.options ? JSON.stringify(q.options) : undefined,
             correctAnswer: JSON.stringify(q.correctAnswer),
-            explanation: q.explanation,
+            // Temporarily store explanation in sampleAnswer until migration runs
+            sampleAnswer: q.explanation || null,
             marks: q.marks,
             order: index + 1,
             difficulty: validatedData.difficulty.toLowerCase(),
@@ -198,9 +164,23 @@ export const generateExamWithAI = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Generate exam error:', error);
+    
+    // Better error handling for validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error: Please check your input data',
+        errors: error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message,
+          received: (err as any).received
+        }))
+      });
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Failed to generate exam',
+      message: error instanceof Error ? error.message : 'Failed to generate exam',
     });
   }
 };
@@ -312,18 +292,30 @@ export const getExam = async (req: Request, res: Response) => {
       });
     }
 
-    // Parse JSON options for questions
-    const examWithParsedOptions = {
+    // Parse JSON fields for questions
+    const examWithParsedData = {
       ...exam,
-      questions: exam.questions.map(q => ({
-        ...q,
-        options: q.options ? JSON.parse(q.options as string) : null,
-      })),
+      questions: exam.questions.map(q => {
+        try {
+          return {
+            ...q,
+            options: q.options ? JSON.parse(q.options as string) : null,
+            correctAnswer: q.correctAnswer ? JSON.parse(q.correctAnswer as string) : null,
+          };
+        } catch (parseError) {
+          console.error('Error parsing question data:', q.id, parseError);
+          return {
+            ...q,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+          };
+        }
+      }),
     };
 
     res.json({
       success: true,
-      data: examWithParsedOptions,
+      data: examWithParsedData,
     });
   } catch (error) {
     console.error('Get exam error:', error);
@@ -335,6 +327,44 @@ export const getExam = async (req: Request, res: Response) => {
 };
 
 // Assign exam to students
+// Get exam assignments
+export const getExamAssignments = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const assignments = await prisma.examAssignment.findMany({
+      where: { examId: id },
+      select: {
+        id: true,
+        studentId: true,
+        student: {
+          select: {
+            name: true,
+            username: true,
+          },
+        },
+        createdAt: true,
+        dueDate: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: assignments,
+    });
+  } catch (error) {
+    console.error('Get assignments error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch assignments',
+    });
+  }
+};
+
 export const assignExam = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -458,30 +488,41 @@ export const startExamAttempt = async (req: Request, res: Response) => {
       });
     }
 
-    // Check if max attempts reached
-    const attemptCount = await prisma.examAttempt.count({
+    // Check for existing incomplete attempt
+    let attempt = await prisma.examAttempt.findFirst({
       where: {
-        examId: id,
-        studentId: (req as any).user.id,
-        isCompleted: true,
-      },
-    });
-
-    if (attemptCount >= assignment.maxAttempts) {
-      return res.status(403).json({
-        success: false,
-        message: 'Maximum attempts reached',
-      });
-    }
-
-    // Create new attempt
-    const attempt = await prisma.examAttempt.create({
-      data: {
         examId: id,
         studentId: (req as any).user.id,
         isCompleted: false,
       },
     });
+
+    // If no incomplete attempt, check if max attempts reached
+    if (!attempt) {
+      const attemptCount = await prisma.examAttempt.count({
+        where: {
+          examId: id,
+          studentId: (req as any).user.id,
+          isCompleted: true,
+        },
+      });
+
+      if (attemptCount >= assignment.maxAttempts) {
+        return res.status(403).json({
+          success: false,
+          message: `Maximum attempts reached (${assignment.maxAttempts} allowed)`,
+        });
+      }
+
+      // Create new attempt
+      attempt = await prisma.examAttempt.create({
+        data: {
+          examId: id,
+          studentId: (req as any).user.id,
+          isCompleted: false,
+        },
+      });
+    }
 
     // Return exam with questions (hide correct answers)
     const examData = {
@@ -681,6 +722,181 @@ export const getExamResults = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch results',
+    });
+  }
+};
+
+// Publish exam
+export const publishExam = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // Check if user owns the exam
+    const exam = await prisma.exam.findUnique({
+      where: { id },
+    });
+
+    if (!exam || exam.creatorId !== (req as any).user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only publish your own exams',
+      });
+    }
+
+    // Update exam status to ACTIVE
+    const updatedExam = await prisma.exam.update({
+      where: { id },
+      data: {
+        status: 'ACTIVE',
+      },
+    });
+
+    res.json({
+      success: true,
+      data: updatedExam,
+      message: 'Exam published successfully',
+    });
+  } catch (error) {
+    console.error('Publish exam error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to publish exam',
+    });
+  }
+};
+
+// Delete exam
+export const deleteExam = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // Check if user owns the exam
+    const exam = await prisma.exam.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            assignments: true,
+            attempts: true,
+          },
+        },
+      },
+    });
+
+    if (!exam || exam.creatorId !== (req as any).user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only delete your own exams',
+      });
+    }
+
+    // Check if exam has assignments or attempts
+    if (exam._count.assignments > 0 || exam._count.attempts > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete exam. It has ${exam._count.assignments} assignment(s) and ${exam._count.attempts} attempt(s). All related data will be deleted permanently.`,
+        data: {
+          assignments: exam._count.assignments,
+          attempts: exam._count.attempts,
+        },
+      });
+    }
+
+    // Delete exam (cascade will delete questions)
+    await prisma.exam.delete({
+      where: { id },
+    });
+
+    res.json({
+      success: true,
+      message: 'Exam deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete exam error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete exam',
+    });
+  }
+};
+
+// Update exam
+export const updateExam = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const validatedData = createExamSchema.parse(req.body);
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // Check if user owns the exam
+    const exam = await prisma.exam.findUnique({
+      where: { id },
+    });
+
+    if (!exam || exam.creatorId !== (req as any).user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only edit your own exams',
+      });
+    }
+
+    // Calculate total marks
+    const totalMarks = validatedData.questions.reduce((sum, q) => sum + q.marks, 0);
+
+    // Delete existing questions and create new ones
+    await prisma.question.deleteMany({
+      where: { examId: id },
+    });
+
+    const updatedExam = await prisma.exam.update({
+      where: { id },
+      data: {
+        title: validatedData.title,
+        subject: validatedData.subject,
+        gradeLevel: validatedData.gradeLevel,
+        duration: validatedData.duration,
+        totalMarks,
+        passingMarks: Math.round(totalMarks * 0.4),
+        questions: {
+          create: validatedData.questions.map((q, index) => ({
+            type: q.type,
+            question: q.question,
+            correctAnswer: typeof q.correctAnswer === 'string' ? q.correctAnswer : JSON.stringify(q.correctAnswer),
+            marks: q.marks,
+            order: index + 1,
+            options: q.options ? (typeof q.options === 'string' ? q.options : JSON.stringify(q.options)) : undefined,
+            sampleAnswer: q.sampleAnswer || q.explanation || undefined,
+            explanation: q.explanation || undefined,
+            difficulty: validatedData.difficulty?.toLowerCase() || 'medium',
+          })),
+        },
+      },
+      include: {
+        questions: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: updatedExam,
+      message: 'Exam updated successfully',
+    });
+  } catch (error) {
+    console.error('Update exam error:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof z.ZodError ? 'Validation error' : 'Failed to update exam',
+      errors: error instanceof z.ZodError ? error.errors : undefined,
     });
   }
 };

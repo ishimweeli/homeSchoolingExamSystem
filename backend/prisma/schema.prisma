@@ -239,6 +239,7 @@ model Question {
   aiGenerated       Boolean       @default(true)
   difficulty        String?       // easy, medium, hard
   topic             String?
+  explanation       String?       @db.Text // Explanation of correct answer
   
   // For better grading
   gradingRubric     Json?         // AI grading criteria
@@ -278,7 +279,7 @@ model ExamAttempt {
   answers           Answer[]
   grade             Grade?
   
-  @@unique([examId, studentId])
+  @@index([examId, studentId])
   @@index([studentId])
   @@map("exam_attempts")
 }
