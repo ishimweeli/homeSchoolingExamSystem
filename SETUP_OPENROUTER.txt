@@ -1,0 +1,66 @@
+# ============================================
+# COPY THESE LINES TO YOUR backend/.env FILE
+# ============================================
+
+# OpenRouter API Key (ONLY key you need!)
+OPENROUTER_API_KEY="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"
+
+# AI Model (change anytime to switch providers/models)
+AI_MODEL="openai/gpt-4o-mini"
+
+# Site info (optional)
+SITE_URL="https://homeschool-exam.com"
+SITE_NAME="HomeSchool Exam System"
+
+# ============================================
+# QUICK START:
+# ============================================
+# 1. Open backend/.env file
+# 2. Add the lines above
+# 3. Remove any OPENAI_API_KEY or USE_OPENROUTER lines
+# 4. Restart server: npm run dev
+# 5. Done! ✅
+
+# ============================================
+# SWITCH MODELS ANYTIME:
+# ============================================
+# Just change AI_MODEL to any of these:
+
+# OpenAI (recommended):
+AI_MODEL="openai/gpt-4o-mini"      # Fast, cheap, great quality
+AI_MODEL="openai/gpt-4o"           # Most capable
+AI_MODEL="openai/gpt-3.5-turbo"    # Cheapest
+
+# Anthropic Claude:
+AI_MODEL="anthropic/claude-3-sonnet"
+AI_MODEL="anthropic/claude-3-opus"
+
+# Google Gemini:
+AI_MODEL="google/gemini-pro"
+
+# Meta Llama:
+AI_MODEL="meta-llama/llama-3-70b-instruct"
+
+# And many more at: https://openrouter.ai/models
+
+# ============================================
+# COMPLETE .env EXAMPLE:
+# ============================================
+
+DATABASE_URL="postgresql://user:password@localhost:5432/homeschooling_db"
+
+JWT_SECRET="your-jwt-secret"
+JWT_REFRESH_SECRET="your-refresh-secret"
+
+OPENROUTER_API_KEY="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"
+AI_MODEL="openai/gpt-4o-mini"
+
+SITE_URL="https://homeschool-exam.com"
+SITE_NAME="HomeSchool Exam System"
+
+FRONTEND_URL="http://localhost:5001"
+PORT=5000
+NODE_ENV=development
+
+# That's it! No OpenAI key needed. OpenRouter handles everything.
+

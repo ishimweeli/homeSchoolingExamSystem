@@ -279,7 +279,7 @@ model ExamAttempt {
   answers           Answer[]
   grade             Grade?
   
-  @@unique([examId, studentId])
+  @@index([examId, studentId])
   @@index([studentId])
   @@map("exam_attempts")
 }

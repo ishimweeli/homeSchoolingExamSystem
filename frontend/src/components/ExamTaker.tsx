@@ -21,6 +21,12 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Checkbox,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import {
   Timer as TimerIcon,
@@ -28,6 +34,7 @@ import {
   NavigateNext as NextIcon,
   NavigateBefore as PrevIcon,
   Send as SubmitIcon,
+  DragIndicator as DragIcon,
 } from '@mui/icons-material';
 import examService from '../services/examService';
 
@@ -40,7 +47,7 @@ interface ExamData {
     id: string;
     type: string;
     question: string;
-    options?: string[];
+    options?: any;
     marks: number;
     order: number;
   }>;
@@ -316,12 +323,155 @@ export const ExamTaker: React.FC = () => {
                 )}
 
                 {currentQ.type === 'FILL_BLANKS' && (
-                  <TextField
-                    value={answers[currentQ.id] || ''}
-                    onChange={(e) => handleAnswer(e.target.value)}
-                    fullWidth
-                    placeholder="Enter your answer..."
-                  />
+                  <Box>
+                    {/* Check if question has blank markers */}
+                    {(currentQ.question.includes('____') || currentQ.question.includes('___')) ? (
+                      <Box>
+                        {/* Split question by blanks and insert input fields */}
+                        {currentQ.question.split(/____+|___+/).map((part, index, arr) => (
+                          <React.Fragment key={index}>
+                            <Typography component="span" variant="body1">
+                              {part}
+                            </Typography>
+                            {index < arr.length - 1 && (
+                              <TextField
+                                value={answers[currentQ.id] || ''}
+                                onChange={(e) => handleAnswer(e.target.value)}
+                                variant="standard"
+                                sx={{
+                                  mx: 1,
+                                  minWidth: 150,
+                                  display: 'inline-flex',
+                                  '& .MuiInputBase-root': {
+                                    fontSize: 'inherit',
+                                  }
+                                }}
+                                placeholder="your answer"
+                                autoFocus={index === 0}
+                              />
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </Box>
+                    ) : (
+                      // Fallback: regular text field if no blanks found
+                      <TextField
+                        value={answers[currentQ.id] || ''}
+                        onChange={(e) => handleAnswer(e.target.value)}
+                        fullWidth
+                        placeholder="Enter your answer..."
+                      />
+                    )}
+                  </Box>
+                )}
+
+                {/* MATCHING Question Type */}
+                {currentQ.type === 'MATCHING' && currentQ.options && (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Match the items by entering pairs (e.g., "1-A, 2-B, 3-C")
+                    </Typography>
+                    {Array.isArray(currentQ.options) && currentQ.options.length > 0 && 
+                     typeof currentQ.options[0] === 'object' && 'active' in currentQ.options[0] ? (
+                      // Display active-passive pairs
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                          Items to Match:
+                        </Typography>
+                        {currentQ.options.map((pair: any, index: number) => (
+                          <Box key={index} sx={{ mb: 1, p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
+                            <Typography variant="body2">
+                              <strong>{index + 1}.</strong> {pair.active} → {pair.passive}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    ) : (
+                      // Display as key-value object
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                          Items to Match:
+                        </Typography>
+                        <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                            {JSON.stringify(currentQ.options, null, 2)}
+                          </pre>
+                        </Box>
+                      </Box>
+                    )}
+                    <TextField
+                      value={answers[currentQ.id] || ''}
+                      onChange={(e) => handleAnswer(e.target.value)}
+                      fullWidth
+                      multiline
+                      rows={3}
+                      placeholder="Enter your matches (e.g., 1-A, 2-B, 3-C)"
+                    />
+                  </Box>
+                )}
+
+                {/* ORDERING Question Type */}
+                {currentQ.type === 'ORDERING' && currentQ.options && (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Arrange the items in the correct order (1, 2, 3, ...)
+                    </Typography>
+                    {Array.isArray(currentQ.options) && (
+                      <List sx={{ bgcolor: 'background.default', borderRadius: 1 }}>
+                        {currentQ.options.map((item: string, index: number) => (
+                          <ListItem key={index} divider>
+                            <ListItemIcon>
+                              <DragIcon />
+                            </ListItemIcon>
+                            <ListItemText 
+                              primary={`${String.fromCharCode(65 + index)}. ${item}`}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    )}
+                    <TextField
+                      value={answers[currentQ.id] || ''}
+                      onChange={(e) => handleAnswer(e.target.value)}
+                      fullWidth
+                      sx={{ mt: 2 }}
+                      placeholder="Enter the correct order (e.g., A, C, B, D)"
+                      helperText="Enter letters separated by commas in the correct order"
+                    />
+                  </Box>
+                )}
+
+                {/* SELECT_ALL Question Type */}
+                {currentQ.type === 'SELECT_ALL' && currentQ.options && Array.isArray(currentQ.options) && (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Select all correct answers:
+                    </Typography>
+                    {currentQ.options.map((option: string, index: number) => {
+                      const currentAnswers = answers[currentQ.id] 
+                        ? (answers[currentQ.id] as string).split(',').map(a => a.trim())
+                        : [];
+                      const isChecked = currentAnswers.includes(option);
+                      
+                      return (
+                        <FormControlLabel
+                          key={index}
+                          control={
+                            <Checkbox
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const newAnswers = e.target.checked
+                                  ? [...currentAnswers, option]
+                                  : currentAnswers.filter(a => a !== option);
+                                handleAnswer(newAnswers.join(', '));
+                              }}
+                            />
+                          }
+                          label={option}
+                        />
+                      );
+                    })}
+                  </Box>
                 )}
 
                 {/* Navigation Buttons */}
