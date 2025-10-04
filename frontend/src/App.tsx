@@ -24,6 +24,7 @@ import StudyModules from './pages/StudyModules'
 import AITools from './pages/AITools'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
+import Subscription from './pages/Subscription'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminTiers from './pages/AdminTiers'
 
@@ -56,6 +57,7 @@ function App() {
         <Route path="/ai-tools" element={<ProtectedRoute><AITools /></ProtectedRoute>} />
         <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
         <Route path="/admin/tiers" element={<ProtectedRoute><AdminTiers /></ProtectedRoute>} />
       </Routes>
     </Router>

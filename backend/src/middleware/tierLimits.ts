@@ -9,7 +9,11 @@ export const checkTierLimit = (action: 'CREATE_EXAM' | 'CREATE_STUDY_MODULE') =>
       const userId = (req as any).user?.id;
 
       if (!userId) {
-        return res.status(401).json({ success: false, error: 'User not authenticated' });
+        return res.status(401).json({ 
+          success: false, 
+          message: 'User not authenticated',
+          error: 'User not authenticated' 
+        });
       }
 
       // Check if user has a tier
@@ -21,6 +25,7 @@ export const checkTierLimit = (action: 'CREATE_EXAM' | 'CREATE_STUDY_MODULE') =>
       if (!userTier) {
         return res.status(403).json({
           success: false,
+          message: 'No subscription tier assigned. Please contact admin to get a subscription.',
           error: 'No subscription tier assigned. Please contact admin to get a subscription.'
         });
       }
@@ -29,6 +34,7 @@ export const checkTierLimit = (action: 'CREATE_EXAM' | 'CREATE_STUDY_MODULE') =>
       if (!userTier.isActive) {
         return res.status(403).json({
           success: false,
+          message: 'Your subscription tier is inactive. Please contact admin.',
           error: 'Your subscription tier is inactive. Please contact admin.'
         });
       }
@@ -42,6 +48,7 @@ export const checkTierLimit = (action: 'CREATE_EXAM' | 'CREATE_STUDY_MODULE') =>
 
         return res.status(403).json({
           success: false,
+          message: 'Your subscription has expired. Please renew your subscription.',
           error: 'Your subscription has expired. Please renew your subscription.'
         });
       }
@@ -65,6 +72,7 @@ export const checkTierLimit = (action: 'CREATE_EXAM' | 'CREATE_STUDY_MODULE') =>
       if (!canPerform) {
         return res.status(403).json({
           success: false,
+          message: limitReachedMessage,
           error: limitReachedMessage,
           tierInfo: {
             tierName: userTier.tier.name,
@@ -85,7 +93,11 @@ export const checkTierLimit = (action: 'CREATE_EXAM' | 'CREATE_STUDY_MODULE') =>
       next();
     } catch (error) {
       console.error('Error checking tier limit:', error);
-      res.status(500).json({ success: false, error: 'Failed to check tier limit' });
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to check tier limit',
+        error: 'Failed to check tier limit' 
+      });
     }
   };
 };

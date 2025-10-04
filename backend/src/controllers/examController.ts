@@ -20,15 +20,16 @@ const createExamSchema = z.object({
   title: z.string().min(3),
   subject: z.string(),
   gradeLevel: z.number().min(1).max(12),
-  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']),
+  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional(),
   duration: z.number().min(5),
   questions: z.array(z.object({
-    type: z.enum(['MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER', 'LONG_ANSWER', 'FILL_BLANKS']),
+    type: z.enum(['MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER', 'LONG_ANSWER', 'FILL_BLANKS', 'MATCHING', 'ORDERING', 'MATH_PROBLEM', 'CODING', 'DIAGRAM']),
     question: z.string(),
-    options: z.array(z.string()).optional(),
-    correctAnswer: z.string(),
+    options: z.union([z.array(z.string()), z.record(z.string()), z.string(), z.null()]).optional(),
+    correctAnswer: z.union([z.string(), z.array(z.string()), z.record(z.string())]),
     marks: z.number(),
-    explanation: z.string().optional(),
+    explanation: z.string().nullable().optional(),
+    sampleAnswer: z.string().nullable().optional(),
   })),
 });
 
@@ -67,10 +68,12 @@ export const createExam = async (req: Request, res: Response) => {
           create: validatedData.questions.map((q, index) => ({
             type: q.type,
             question: q.question,
-            correctAnswer: JSON.stringify(q.correctAnswer),
+            correctAnswer: typeof q.correctAnswer === 'string' ? q.correctAnswer : JSON.stringify(q.correctAnswer),
             marks: q.marks,
             order: index + 1,
-            options: q.options ? JSON.stringify(q.options) : undefined,
+            options: q.options ? (typeof q.options === 'string' ? q.options : JSON.stringify(q.options)) : undefined,
+            sampleAnswer: q.sampleAnswer || q.explanation || undefined,
+            explanation: q.explanation || undefined,
             difficulty: validatedData.difficulty?.toLowerCase() || 'medium',
           })),
         },
@@ -123,20 +126,30 @@ export const generateExamWithAI = async (req: Request, res: Response) => {
     - Difficulty: ${validatedData.difficulty}
     - Question Types: ${validatedData.questionTypes?.join(', ') || 'Mix of all types'}
 
+    IMPORTANT: Only use these question types:
+    - MULTIPLE_CHOICE (for single-answer multiple choice)
+    - TRUE_FALSE (for true/false questions)
+    - SHORT_ANSWER (for short text answers)
+    - LONG_ANSWER (for essay-style answers)
+    - FILL_BLANKS (for fill in the blank questions)
+    - MATCHING (for matching pairs)
+    - ORDERING (for ordering/sequencing)
+    - MATH_PROBLEM (for mathematical problems)
+
     Generate ${validatedData.questionCount} questions appropriate for grade ${validatedData.gradeLevel}.
     Include variety in question types. For each question provide:
     1. The question text
-    2. Options (for multiple choice)
+    2. Options (for multiple choice - as an array)
     3. Correct answer
     4. Brief explanation
     5. Marks (based on difficulty: Easy=2, Medium=5, Hard=10)
 
-    Return as JSON array with this structure:
+    Return ONLY a JSON array with this exact structure (no markdown, no extra text):
     [{
       "type": "MULTIPLE_CHOICE",
       "question": "...",
-      "options": ["..."],
-      "correctAnswer": "...",
+      "options": ["option1", "option2", "option3"],
+      "correctAnswer": "correct option",
       "explanation": "...",
       "marks": 5
     }]`;
@@ -157,11 +170,72 @@ export const generateExamWithAI = async (req: Request, res: Response) => {
       max_tokens: 2000,
     });
 
-    const aiResponse = completion.choices[0].message.content;
-    const questions = JSON.parse(aiResponse || '[]');
+    const aiResponse = completion.choices[0].message.content || '[]';
+    
+    // Strip markdown code fences if present (OpenAI often wraps JSON in ```json ... ```)
+    let cleanedResponse = aiResponse.trim();
+    if (cleanedResponse.startsWith('```')) {
+      // Remove opening code fence (```json or ```javascript or ```)
+      cleanedResponse = cleanedResponse.replace(/^```(?:json|javascript)?\n?/, '');
+      // Remove closing code fence
+      cleanedResponse = cleanedResponse.replace(/\n?```$/, '');
+      cleanedResponse = cleanedResponse.trim();
+    }
+    
+    let questions;
+    try {
+      questions = JSON.parse(cleanedResponse);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', cleanedResponse.substring(0, 200));
+      throw new Error('AI returned invalid JSON format. Please try again.');
+    }
+    
+    if (!Array.isArray(questions) || questions.length === 0) {
+      throw new Error('AI did not generate any questions. Please try again with different parameters.');
+    }
+
+    // Valid question types from Prisma schema
+    const validQuestionTypes = [
+      'MULTIPLE_CHOICE',
+      'TRUE_FALSE',
+      'SHORT_ANSWER',
+      'LONG_ANSWER',
+      'FILL_BLANKS',
+      'MATCHING',
+      'ORDERING',
+      'MATH_PROBLEM',
+      'CODING',
+      'DIAGRAM'
+    ];
+
+    // Map invalid types to valid ones
+    const typeMapping: Record<string, string> = {
+      'SELECT_ALL': 'MULTIPLE_CHOICE', // Map SELECT_ALL to MULTIPLE_CHOICE
+      'MULTI_SELECT': 'MULTIPLE_CHOICE',
+      'ESSAY': 'LONG_ANSWER',
+      'FILL_IN_THE_BLANK': 'FILL_BLANKS',
+      'MATCH': 'MATCHING',
+      'ORDER': 'ORDERING'
+    };
+
+    // Validate and fix question types
+    const validatedQuestions = questions.map((q: any, index: number) => {
+      let questionType = q.type?.toUpperCase();
+      
+      // If type is invalid, try to map it
+      if (!validQuestionTypes.includes(questionType)) {
+        questionType = typeMapping[questionType] || 'SHORT_ANSWER'; // Default to SHORT_ANSWER if no mapping
+        console.warn(`Invalid question type "${q.type}" mapped to "${questionType}" for question ${index + 1}`);
+      }
+
+      return {
+        ...q,
+        type: questionType
+      };
+    });
 
     // Calculate total marks
-    const totalMarks = questions.reduce((sum: number, q: any) => sum + q.marks, 0);
+    const totalMarks = validatedQuestions.reduce((sum: number, q: any) => sum + q.marks, 0);
 
     // Create exam with AI-generated questions
     const exam = await prisma.exam.create({
@@ -175,12 +249,13 @@ export const generateExamWithAI = async (req: Request, res: Response) => {
         creatorId: (req as any).user.id,
         aiGenerated: true,
         questions: {
-          create: questions.map((q: any, index: number) => ({
+          create: validatedQuestions.map((q: any, index: number) => ({
             type: q.type,
             question: q.question,
             options: q.options ? JSON.stringify(q.options) : undefined,
             correctAnswer: JSON.stringify(q.correctAnswer),
-            explanation: q.explanation,
+            // Temporarily store explanation in sampleAnswer until migration runs
+            sampleAnswer: q.explanation || null,
             marks: q.marks,
             order: index + 1,
             difficulty: validatedData.difficulty.toLowerCase(),
@@ -198,9 +273,23 @@ export const generateExamWithAI = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Generate exam error:', error);
+    
+    // Better error handling for validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error: Please check your input data',
+        errors: error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message,
+          received: (err as any).received
+        }))
+      });
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Failed to generate exam',
+      message: error instanceof Error ? error.message : 'Failed to generate exam',
     });
   }
 };

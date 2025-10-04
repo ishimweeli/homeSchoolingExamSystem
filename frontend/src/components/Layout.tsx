@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BookOpen, Users, FileText, Brain, BarChart3, Settings,
   LogOut, Menu, X, Home, Plus, Calendar, Award, TrendingUp,
   Clock, CheckCircle, AlertCircle, Sparkles, User, GraduationCap,
   BookMarked, Activity, Target, Zap, Search, Filter, ChevronRight,
   Edit, Trash2, Eye, Download, Upload, RefreshCw, ArrowUp, ArrowDown,
-  PenTool, UserPlus, FolderOpen, MoreVertical
+  PenTool, UserPlus, FolderOpen, MoreVertical, ChevronDown, CreditCard
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -27,11 +27,25 @@ export default function Layout({ children }: LayoutProps) {
   const { user: authUser, isAuthenticated, fetchProfile, logout } = useAuthStore();
   const user = (authUser as unknown as UserShape) || null;
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     ensureUser();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const ensureUser = async () => {
@@ -46,6 +60,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const handleLogout = () => {
     logout();
+    setShowUserMenu(false);
     navigate('/login');
   };
 
@@ -54,6 +69,7 @@ export default function Layout({ children }: LayoutProps) {
     { id: 'exams', label: 'Exams', icon: FileText, path: '/exams', roles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'] },
     { id: 'modules', label: 'Study Modules', icon: BookOpen, path: '/modules', roles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'] },
     { id: 'students', label: 'Students', icon: Users, path: '/students', roles: ['TEACHER', 'PARENT', 'ADMIN'] },
+    { id: 'subscription', label: 'Subscription', icon: CreditCard, path: '/subscription', roles: ['TEACHER', 'PARENT', 'ADMIN'] },
     { id: 'ai-tools', label: 'AI Tools', icon: Brain, path: '/ai-tools', roles: ['TEACHER', 'ADMIN'] },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics', roles: ['TEACHER', 'PARENT', 'ADMIN'] },
     { id: 'admin-tiers', label: 'Admin', icon: Settings, path: '/admin/tiers', roles: ['ADMIN'] },
@@ -189,27 +205,6 @@ export default function Layout({ children }: LayoutProps) {
             </div>
           )}
         </nav>
-
-        <div className="p-4 border-t border-gray-200">
-          <div className={`flex items-center ${!sidebarOpen ? 'justify-center' : ''} mb-4`}>
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-purple-600" />
-            </div>
-            {sidebarOpen && (
-              <div className="ml-3">
-                <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-                <p className="text-xs text-gray-500 capitalize">{user?.role?.toLowerCase()}</p>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={handleLogout}
-            className={`w-full flex items-center ${!sidebarOpen ? 'justify-center' : ''} px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium`}
-          >
-            <LogOut className="w-5 h-5" />
-            {sidebarOpen && <span className="ml-3">Logout</span>}
-          </button>
-        </div>
       </div>
 
       {/* Main Content */}
@@ -221,7 +216,7 @@ export default function Layout({ children }: LayoutProps) {
               <div className="text-xs text-gray-500">Mwalimu Tools</div>
               <h2 className="text-lg md:text-xl font-semibold text-gray-900 truncate">{pageTitle}</h2>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <button
                 onClick={handleRefresh}
                 className="p-2.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
@@ -235,10 +230,51 @@ export default function Layout({ children }: LayoutProps) {
                   className="px-3 md:px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 text-sm font-medium"
                 >
                   <span className="hidden md:inline">Create</span>
-                  <span className="md:hidden">+
-                  </span>
+                  <span className="md:hidden">+</span>
                 </button>
               )}
+              
+              {/* User Profile Dropdown */}
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="w-9 h-9 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-semibold">
+                      {user?.name?.charAt(0).toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                </button>
+                
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                      <p className="text-xs text-purple-600 font-medium capitalize mt-1">{user?.role?.toLowerCase()}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        navigate('/settings');
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center"
+                    >
+                      <User className="w-4 h-4 mr-3 text-gray-500" />
+                      Profile Settings
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center border-t border-gray-100 mt-1"
+                    >
+                      <LogOut className="w-4 h-4 mr-3" />
+                      Log Out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

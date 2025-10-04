@@ -75,19 +75,46 @@ export default function ExamCreateProfessional() {
     setSuccess('');
 
     try {
+      // Calculate total question count
+      const totalQuestions = questionTypes.reduce((sum, qt) => sum + qt.count, 0);
+
+      // Format question types for the backend (just the type names, not objects)
+      const selectedQuestionTypes = questionTypes
+        .filter(qt => qt.count > 0)
+        .map(qt => qt.type);
+
+      // Handle difficulty mapping - backend expects EASY, MEDIUM, or HARD
+      let difficultyForBackend = examInfo.difficulty;
+      if (examInfo.difficulty === 'MIXED' || examInfo.difficulty === 'Mixed (Balanced)') {
+        difficultyForBackend = 'MEDIUM';
+      }
+
       const payload = {
-        ...examInfo,
-        questionTypes: questionTypes.filter(qt => qt.count > 0).map(qt => ({
-          type: qt.type,
-          count: qt.count
-        })),
-        topics: examInfo.topics.split(',').map(t => t.trim())
+        title: examInfo.title,
+        subject: examInfo.subject,
+        gradeLevel: examInfo.gradeLevel,
+        questionCount: totalQuestions,
+        difficulty: difficultyForBackend,
+        questionTypes: selectedQuestionTypes,
+        topics: examInfo.topics.split(',').map(t => t.trim()),
+        duration: examInfo.duration,
+        // If mixed, tell backend to vary difficulty
+        mixedDifficulty: examInfo.difficulty === 'MIXED' || examInfo.difficulty === 'Mixed (Balanced)'
       };
 
       const response = await api.post('/exams/generate', payload);
 
       if ((response as any)?.success) {
-        setGeneratedExam((response as any).data);
+        // Parse JSON strings in questions (options, correctAnswer)
+        const examData = (response as any).data;
+        if (examData.questions) {
+          examData.questions = examData.questions.map((q: any) => ({
+            ...q,
+            options: q.options ? (typeof q.options === 'string' ? JSON.parse(q.options) : q.options) : null,
+            correctAnswer: q.correctAnswer ? (typeof q.correctAnswer === 'string' ? JSON.parse(q.correctAnswer) : q.correctAnswer) : null
+          }));
+        }
+        setGeneratedExam(examData);
         setCurrentStep(2);
         setSuccess('Exam generated successfully! Review and edit as needed.');
       } else {
@@ -97,7 +124,25 @@ export default function ExamCreateProfessional() {
         setCurrentStep(1);
       }
     } catch (err: any) {
-      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to generate exam.';
+      console.error('Exam generation error:', err);
+      
+      // Better error message handling
+      let message = 'Failed to generate exam.';
+      
+      if (err?.response?.data?.errors) {
+        // Validation errors from backend
+        const errors = err.response.data.errors;
+        message = `Validation Error: ${errors.map((e: any) => `${e.field}: ${e.message}`).join(', ')}`;
+      } else if (err?.response?.data?.message) {
+        // Check 'message' field
+        message = err.response.data.message;
+      } else if (err?.response?.data?.error) {
+        // Check 'error' field (tier limits use this)
+        message = err.response.data.error;
+      } else if (err?.message) {
+        message = err.message;
+      }
+      
       setError(message);
       setGeneratedExam(null);
       setCurrentStep(1);
@@ -117,9 +162,22 @@ export default function ExamCreateProfessional() {
     setError('');
 
     try {
+      // Clean up exam data - only send fields needed by backend
       const examData = {
-        ...generatedExam,
-        status: 'PUBLISHED'
+        title: generatedExam.title,
+        subject: generatedExam.subject,
+        gradeLevel: generatedExam.gradeLevel,
+        duration: generatedExam.duration,
+        difficulty: 'MEDIUM', // Default difficulty
+        questions: generatedExam.questions.map((q: any) => ({
+          type: q.type,
+          question: q.question,
+          options: q.options || null,
+          correctAnswer: q.correctAnswer,
+          marks: q.marks,
+          explanation: q.explanation || q.sampleAnswer || null,
+          sampleAnswer: q.sampleAnswer || q.explanation || null,
+        }))
       };
 
       const response = await api.post('/exams', examData);
@@ -132,6 +190,7 @@ export default function ExamCreateProfessional() {
         setError(message);
       }
     } catch (err: any) {
+      console.error('Publish error:', err);
       const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to publish exam. Please try again.';
       setError(message);
     } finally {
@@ -142,9 +201,22 @@ export default function ExamCreateProfessional() {
   const saveDraft = async () => {
     setLoading(true);
     try {
+      // Clean up exam data - only send fields needed by backend
       const examData = {
-        ...generatedExam,
-        status: 'DRAFT'
+        title: generatedExam.title,
+        subject: generatedExam.subject,
+        gradeLevel: generatedExam.gradeLevel,
+        duration: generatedExam.duration,
+        difficulty: 'MEDIUM', // Default difficulty
+        questions: generatedExam.questions.map((q: any) => ({
+          type: q.type,
+          question: q.question,
+          options: q.options || null,
+          correctAnswer: q.correctAnswer,
+          marks: q.marks,
+          explanation: q.explanation || q.sampleAnswer || null,
+          sampleAnswer: q.sampleAnswer || q.explanation || null,
+        }))
       };
 
       const response = await api.post('/exams', examData);
@@ -155,6 +227,7 @@ export default function ExamCreateProfessional() {
         setError(message);
       }
     } catch (err: any) {
+      console.error('Save draft error:', err);
       const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to save draft';
       setError(message);
     } finally {
@@ -457,7 +530,7 @@ export default function ExamCreateProfessional() {
                         className="w-full px-3 py-2 border rounded-lg"
                         rows={2}
                       />
-                      {q.options && (
+                      {Array.isArray(q.options) && (
                         <div className="space-y-1">
                           {q.options.map((opt: string, i: number) => (
                             <input
@@ -476,7 +549,13 @@ export default function ExamCreateProfessional() {
                       )}
                       <input
                         type="text"
-                        value={q.correctAnswer}
+                        value={
+                          Array.isArray(q.correctAnswer)
+                            ? q.correctAnswer.join(', ')
+                            : typeof q.correctAnswer === 'object'
+                              ? JSON.stringify(q.correctAnswer)
+                              : q.correctAnswer
+                        }
                         onChange={(e) => updateQuestion(index, 'correctAnswer', e.target.value)}
                         className="w-full px-3 py-1 border rounded"
                         placeholder="Correct answer"
@@ -485,7 +564,7 @@ export default function ExamCreateProfessional() {
                   ) : (
                     <div>
                       <p className="text-gray-800 mb-2">{q.question}</p>
-                      {q.options && (
+                      {Array.isArray(q.options) && (
                         <div className="ml-4 space-y-1">
                           {q.options.map((opt: string, i: number) => (
                             <p key={i} className="text-sm text-gray-600">
@@ -495,7 +574,13 @@ export default function ExamCreateProfessional() {
                         </div>
                       )}
                       <p className="text-sm text-green-600 mt-2">
-                        Answer: {Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer}
+                        Answer: {
+                          Array.isArray(q.correctAnswer)
+                            ? q.correctAnswer.join(', ')
+                            : typeof q.correctAnswer === 'object'
+                              ? JSON.stringify(q.correctAnswer)
+                              : q.correctAnswer
+                        }
                       </p>
                     </div>
                   )}

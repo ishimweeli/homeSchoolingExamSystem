@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Crown, Shield, Zap, Users, Plus, Check, DollarSign, Package, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { useAuthStore } from '../stores/authStore';
 
 interface Tier {
   id: string;
@@ -45,22 +46,40 @@ interface User {
 }
 
 export default function AdminTiers() {
+  const { user } = useAuthStore();
+  const isAdmin = (user?.role || '').toUpperCase() === 'ADMIN';
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [userTiers, setUserTiers] = useState<UserTier[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showCreateTierModal, setShowCreateTierModal] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [selectedTier, setSelectedTier] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'tiers' | 'subscriptions'>('tiers');
   const [loading, setLoading] = useState(false);
   const [stats] = useState<any>(null);
+  
+  // New tier form state
+  const [newTier, setNewTier] = useState<Partial<Tier>>({
+    name: '',
+    description: '',
+    maxExams: 10,
+    maxStudyModules: 10,
+    maxStudents: 50,
+    price: 0,
+    currency: 'USD',
+    validityDays: 30,
+    isActive: true
+  });
 
   useEffect(() => {
     fetchTiers();
-    fetchUserTiers();
-    fetchUsers();
-  }, []);
+    if (isAdmin) {
+      fetchUserTiers();
+      fetchUsers();
+    }
+  }, [isAdmin]);
 
   const fetchTiers = async () => {
     try {
@@ -81,6 +100,7 @@ export default function AdminTiers() {
   };
 
   const fetchUserTiers = async () => {
+    if (!isAdmin) return;
     try {
       // Use the active backend route
       const response: any = await api.get('/tiers/users/all');
@@ -97,6 +117,7 @@ export default function AdminTiers() {
   };
 
   const fetchUsers = async () => {
+    if (!isAdmin) return;
     try {
       const response: any = await api.get('/admin/users', userSearch ? { q: userSearch } : undefined);
       if (response?.success && Array.isArray(response.data)) {
@@ -106,6 +127,44 @@ export default function AdminTiers() {
       }
     } catch (error) {
       console.error('Error fetching users:', error);
+    }
+  };
+
+  const createTier = async () => {
+    if (!newTier.name) {
+      toast.error('Please provide a tier name');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response: any = await api.post('/tiers', newTier);
+
+      const success = response?.success ?? response?.data?.success;
+      if (success) {
+        toast.success('Tier created successfully!');
+        setShowCreateTierModal(false);
+        // Reset form
+        setNewTier({
+          name: '',
+          description: '',
+          maxExams: 10,
+          maxStudyModules: 10,
+          maxStudents: 50,
+          price: 0,
+          currency: 'USD',
+          validityDays: 30,
+          isActive: true
+        });
+        fetchTiers();
+      } else {
+        toast.error(response?.error || response?.message || 'Failed to create tier');
+      }
+    } catch (error: any) {
+      console.error('Error creating tier:', error);
+      toast.error(error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create tier');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -182,6 +241,13 @@ export default function AdminTiers() {
             <p className="text-gray-600">Manage subscription tiers and user assignments</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowCreateTierModal(true)}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center gap-2 font-medium shadow-lg"
+            >
+              <Plus className="w-4 h-4" />
+              Create New Tier
+            </button>
             <div className="relative">
               <input
                 value={userSearch}
@@ -529,6 +595,181 @@ export default function AdminTiers() {
                   setSelectedTier('');
                 }}
                 className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Tier Modal */}
+      {showCreateTierModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl p-8 max-w-2xl w-full my-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Tier</h2>
+
+            <div className="space-y-6">
+              {/* Tier Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tier Name *
+                </label>
+                <input
+                  type="text"
+                  value={newTier.name || ''}
+                  onChange={(e) => setNewTier({...newTier, name: e.target.value})}
+                  placeholder="e.g., Free, Basic, Pro, Enterprise"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newTier.description || ''}
+                  onChange={(e) => setNewTier({...newTier, description: e.target.value})}
+                  placeholder="Brief description of this tier"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* Limits Grid */}
+              <div className="grid grid-cols-3 gap-4">
+                {/* Max Exams */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Max Exams *
+                  </label>
+                  <input
+                    type="number"
+                    value={newTier.maxExams || 0}
+                    onChange={(e) => setNewTier({...newTier, maxExams: parseInt(e.target.value) || 0})}
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">0 = unlimited</p>
+                </div>
+
+                {/* Max Study Modules */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Max Study Modules *
+                  </label>
+                  <input
+                    type="number"
+                    value={newTier.maxStudyModules || 0}
+                    onChange={(e) => setNewTier({...newTier, maxStudyModules: parseInt(e.target.value) || 0})}
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">0 = unlimited</p>
+                </div>
+
+                {/* Max Students */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Max Students *
+                  </label>
+                  <input
+                    type="number"
+                    value={newTier.maxStudents || 0}
+                    onChange={(e) => setNewTier({...newTier, maxStudents: parseInt(e.target.value) || 0})}
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">0 = unlimited</p>
+                </div>
+              </div>
+
+              {/* Pricing */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Price */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Price *
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={newTier.currency || 'USD'}
+                      onChange={(e) => setNewTier({...newTier, currency: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="USD">USD $</option>
+                      <option value="RWF">RWF</option>
+                      <option value="EUR">EUR €</option>
+                      <option value="GBP">GBP £</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={newTier.price || 0}
+                      onChange={(e) => setNewTier({...newTier, price: parseFloat(e.target.value) || 0})}
+                      min="0"
+                      step="0.01"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">0 = free tier</p>
+                </div>
+
+                {/* Validity Days */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Validity (Days) *
+                  </label>
+                  <input
+                    type="number"
+                    value={newTier.validityDays || 30}
+                    onChange={(e) => setNewTier({...newTier, validityDays: parseInt(e.target.value) || 30})}
+                    min="1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">How long tier lasts</p>
+                </div>
+              </div>
+
+              {/* Active Status */}
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={newTier.isActive || false}
+                  onChange={(e) => setNewTier({...newTier, isActive: e.target.checked})}
+                  className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                />
+                <label className="text-sm font-medium text-gray-700">
+                  Active (users can be assigned to this tier)
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-4 mt-8">
+              <button
+                onClick={createTier}
+                disabled={loading || !newTier.name}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {loading ? 'Creating...' : 'Create Tier'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowCreateTierModal(false);
+                  setNewTier({
+                    name: '',
+                    description: '',
+                    maxExams: 10,
+                    maxStudyModules: 10,
+                    maxStudents: 50,
+                    price: 0,
+                    currency: 'USD',
+                    validityDays: 30,
+                    isActive: true
+                  });
+                }}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
               >
                 Cancel
               </button>
