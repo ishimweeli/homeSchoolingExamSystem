@@ -31,7 +31,7 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
-          sshpass -e ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 "${SERVER_USER}@${SERVER_IP}" << 'EOFMARKER'
+          sshpass -e ssh -T -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 "${SERVER_USER}@${SERVER_IP}" << 'EOFMARKER'
           set -e
 
           echo "🚀 Starting production deployment..."
