@@ -8,6 +8,7 @@ on:
 jobs:
   deploy-staging:
     runs-on: ubuntu-latest
+    environment: production  # Access environment secrets
 
     steps:
       - name: Checkout code
