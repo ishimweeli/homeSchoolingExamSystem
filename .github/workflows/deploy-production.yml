@@ -28,8 +28,10 @@ jobs:
       - name: Deploy to Production Server
         env:
           SSHPASS: ${{ secrets.SSH_PASSPHRASE }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
-          sshpass -e ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOFMARKER'
+          sshpass -e ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 "${SERVER_USER}@${SERVER_IP}" << 'EOFMARKER'
           set -e
 
           echo "🚀 Starting production deployment..."
@@ -56,7 +58,9 @@ jobs:
           echo "🏗️  Building and starting containers..."
           JWT_SECRET="${{ secrets.JWT_SECRET }}" \
           JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
-          OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+          OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" \
+          AI_MODEL="${{ secrets.AI_MODEL }}" \
+          SITE_NAME="${{ secrets.SITE_NAME }}" \
           FLUTTERWAVE_PUBLIC_KEY="${{ secrets.FLUTTERWAVE_PUBLIC_KEY }}" \
           FLUTTERWAVE_SECRET_KEY="${{ secrets.FLUTTERWAVE_SECRET_KEY }}" \
           FLUTTERWAVE_ENCRYPTION_KEY="${{ secrets.FLUTTERWAVE_ENCRYPTION_KEY }}" \

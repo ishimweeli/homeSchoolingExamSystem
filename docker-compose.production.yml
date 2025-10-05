@@ -32,15 +32,16 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_EXPIRES_IN: 1h
       JWT_REFRESH_EXPIRES_IN: 7d
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_MODEL: gpt-4o-mini
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      AI_MODEL: ${AI_MODEL}
+      SITE_NAME: ${SITE_NAME}
       FLUTTERWAVE_PUBLIC_KEY: ${FLUTTERWAVE_PUBLIC_KEY}
       FLUTTERWAVE_SECRET_KEY: ${FLUTTERWAVE_SECRET_KEY}
       FLUTTERWAVE_ENCRYPTION_KEY: ${FLUTTERWAVE_ENCRYPTION_KEY}
       FLUTTERWAVE_WEBHOOK_SECRET: ${FLUTTERWAVE_WEBHOOK_SECRET}
-      FLUTTERWAVE_REDIRECT_URL: http://YOUR_PRODUCTION_SERVER_IP:5005/payment/callback
+      FLUTTERWAVE_REDIRECT_URL: http://46.101.148.62:5005/payment/callback
       FLUTTERWAVE_CURRENCY: RWF
-      FRONTEND_URL: http://YOUR_PRODUCTION_SERVER_IP:5005
+      FRONTEND_URL: http://46.101.148.62:5005
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
@@ -68,7 +69,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://YOUR_PRODUCTION_SERVER_IP:5004/api
+        VITE_API_URL: http://46.101.148.62:5004/api
     container_name: homeschool-frontend-production
     restart: unless-stopped
     ports:
