@@ -5,49 +5,60 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding tiers...');
 
-  // Create default tiers - SIMPLIFIED (only exams & modules limits)
+  // Create default tiers with creation limits and attempt pools
+  // Teachers get a pool of attempts to distribute across students
   const tiers = [
     {
       name: 'Free Trial',
-      description: 'Free trial - 7 days',
+      description: 'Try it out - Limited resources for 7 days',
       maxExams: 2,
       maxStudyModules: 2,
+      maxStudents: 5,
+      totalAttemptsPool: 20,      // 20 total attempts to distribute
       validityDays: 7,
       price: 0,
       currency: 'RWF'
     },
     {
       name: 'Basic',
-      description: 'Basic plan - 30 days',
+      description: 'Basic plan - Good for small groups',
       maxExams: 10,
       maxStudyModules: 10,
+      maxStudents: 25,
+      totalAttemptsPool: 100,     // 100 total attempts to distribute
       validityDays: 30,
       price: 5000,
       currency: 'RWF'
     },
     {
       name: 'Standard',
-      description: 'Standard plan - 30 days',
+      description: 'Standard plan - For growing classrooms',
       maxExams: 25,
       maxStudyModules: 25,
+      maxStudents: 50,
+      totalAttemptsPool: 300,     // 300 total attempts to distribute
       validityDays: 30,
       price: 15000,
       currency: 'RWF'
     },
     {
       name: 'Professional',
-      description: 'Professional plan - 30 days',
+      description: 'Professional plan - For large schools',
       maxExams: 50,
       maxStudyModules: 50,
+      maxStudents: 100,
+      totalAttemptsPool: 1000,    // 1000 total attempts to distribute
       validityDays: 30,
       price: 30000,
       currency: 'RWF'
     },
     {
       name: 'Unlimited',
-      description: 'Unlimited plan - 30 days',
+      description: 'Unlimited plan - No restrictions',
       maxExams: 999999,
       maxStudyModules: 999999,
+      maxStudents: 999999,
+      totalAttemptsPool: 999999,  // Unlimited attempts
       validityDays: 30,
       price: 50000,
       currency: 'RWF'

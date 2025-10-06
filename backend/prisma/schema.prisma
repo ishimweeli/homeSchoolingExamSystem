@@ -179,72 +179,103 @@ model Exam {
   description       String?
   subject           String
   gradeLevel        Int
-  
+
   // AI Generation Config
   aiGenerated       Boolean       @default(true)
   aiConfig          Json?         // Stores AI generation parameters
-  
+  hasAdvancedStructure Boolean    @default(false) // Advanced mode with sections
+
   // Exam Settings
   duration          Int?          // in minutes
   totalMarks        Int           @default(100)
   passingMarks      Int           @default(50)
-  
+
   // Result publishing settings
   autoPublishResults Boolean      @default(true) // true = immediate, false = manual
-  
+
   status            ExamStatus    @default(DRAFT)
   scheduledFor      DateTime?
-  
+
   // Relations
   creatorId         String
   creator           User          @relation("ExamCreator", fields: [creatorId], references: [id])
-  
-  questions         Question[]
+
+  sections          ExamSection[] // For advanced mode
+  questions         Question[]    // For simple mode (direct questions)
   attempts          ExamAttempt[]
   assignments       ExamAssignment[]
-  
+
   // Curriculum standards
   standards         CurriculumStandard[] @relation("ExamStandards")
-  
+
   // Metadata
   instructions      String?
   allowedResources  String[]      @default([])
-  
+
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
-  
+
   @@index([creatorId])
   @@map("exams")
+}
+
+model ExamSection {
+  id           String   @id @default(cuid())
+  examId       String
+  exam         Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  code         String   // "A", "B", "C"
+  title        String   // "READING COMPREHENSION", "VOCABULARY", etc.
+  description  String?  @db.Text
+  instructions String?  @db.Text // Section-specific instructions
+  totalMarks   Int      @default(0)
+  order        Int      @default(0)
+
+  questions    Question[]
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([examId])
+  @@map("exam_sections")
 }
 
 model Question {
   id                String        @id @default(cuid())
   examId            String
   exam              Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
-  
+
+  // Optional section link (for advanced mode)
+  sectionId         String?
+  section           ExamSection?  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
   type              QuestionType
   question          String        @db.Text
-  
+
   // Different answer formats based on type
   options           Json?         // For MCQ, matching
   correctAnswer     Json          // Can be string, array, or object based on type
-  
+
   // File attachments for rich questions
   imageUrl          String?       // Question image/diagram
   attachments       String[]      @default([]) // Additional files
-  
+
   marks             Int           @default(5)
-  
+
   // AI specific fields
   aiGenerated       Boolean       @default(true)
   difficulty        String?       // easy, medium, hard
   topic             String?
   explanation       String?       @db.Text // Explanation of correct answer
-  
+
   // For better grading
   gradingRubric     Json?         // AI grading criteria
   sampleAnswer      String?       @db.Text
-  
+
+  // Advanced mode fields
+  questionNumber    String?       // "1", "a)", "i)", etc.
+  context           String?       @db.Text // Reading passage or context for this question group
+
   order             Int           @default(0)
   
   // Relations
@@ -415,6 +446,7 @@ model ExamAssignment {
   startDate         DateTime?
   allowLateSubmission Boolean     @default(false)
   maxAttempts       Int           @default(1)
+  attemptsUsed      Int           @default(0)
   
   // Status tracking
   isActive          Boolean       @default(true)
@@ -781,6 +813,9 @@ model StudyModule {
   xpReward      Int      @default(100)
   badgeType     String?  // Type of badge awarded on completion
   
+  // Publishing status
+  status        ModulePublishStatus @default(PUBLISHED)
+  
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   
@@ -997,6 +1032,12 @@ enum ModuleStatus {
   PAUSED
 }
 
+enum ModulePublishStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model StudyProgress {
   id            String   @id @default(cuid())
   
@@ -1076,13 +1117,16 @@ model Tier {
   name              String    @unique
   description       String?
 
-  // ONLY these limits matter:
-  maxExams          Int       @default(10)  // Maximum exams user can create
-  maxStudyModules   Int       @default(10)  // Maximum study modules user can create
-  maxStudents       Int       @default(50)  // Maximum students user can create
-
+  // Creation limits
+  maxExams          Int       @default(10)   // Maximum exams teacher can create
+  maxStudyModules   Int       @default(10)   // Maximum study modules teacher can create
+  maxStudents       Int       @default(50)   // Maximum students teacher can createat
+  
+  // Attempt pool - Total attempts teacher can distribute
+  totalAttemptsPool Int       @default(100)  // Total attempts to distribute across all students/exams
+  
   // Duration
-  validityDays      Int       @default(30)  // How long the tier lasts (default 30 days)
+  validityDays      Int       @default(30)   // How long the tier lasts (default 30 days)
 
   // Pricing (for future payment integration)
   price             Float     @default(0)
@@ -1108,10 +1152,11 @@ model UserTier {
   tierId            String
   tier              Tier      @relation(fields: [tierId], references: [id])
 
-  // Usage tracking (ONLY track what we limit)
-  examsCreated      Int       @default(0)
-  studyModulesCreated Int     @default(0)
-  studentsCreated   Int       @default(0)
+  // Usage tracking
+  examsCreated      Int       @default(0)  // Track how many exams created
+  studyModulesCreated Int     @default(0)  // Track how many modules created
+  studentsCreated   Int       @default(0)  // Track how many students created
+  attemptsUsed      Int       @default(0)  // Track how many attempts distributed to students
 
   // Assignment details
   assignedBy        String?   // Admin who assigned this tier

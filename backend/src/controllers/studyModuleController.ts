@@ -1,19 +1,8 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../utils/db';
-import OpenAI from 'openai';
 import { incrementTierUsage } from '../middleware/tierLimits';
-
-let openai: OpenAI | null = null;
-
-const getOpenAI = () => {
-  if (!openai && process.env.OPENAI_API_KEY) {
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
-  return openai;
-};
+import { getAIClient, getAIModel, isAIAvailable } from '../utils/aiClient';
 
 // Validation schemas
 const createStudyModuleSchema = z.object({
@@ -105,29 +94,70 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const openaiClient = getOpenAI();
-    if (!openaiClient) {
+    const aiClient = getAIClient();
+    if (!aiClient || !isAIAvailable()) {
       return res.status(503).json({
         success: false,
-        message: 'AI generation is not available. OpenAI API key is missing.'
+        message: 'AI generation is not available. OpenRouter API key is missing.'
       });
     }
 
     // Build prompt for AI to create interactive lessons
-    const prompt = `Create an interactive, Duolingo-style study module with the following specifications:
+    const prompt = `Create a WORLD-CLASS, interactive, Duolingo-style study module for "${validatedData.topic}" that PARENTS WORLDWIDE will want to buy and students will LOVE learning from.
+
+    SPECIFICATIONS:
     - Subject: ${validatedData.subject}
     - Grade Level: ${validatedData.gradeLevel}
     - Topic: ${validatedData.topic}
     - Difficulty: ${validatedData.difficulty}
     - Number of Lessons: ${validatedData.lessonCount}
-    ${validatedData.includeGamification ? '- Include gamification elements (XP points, achievements)' : ''}
+    ${validatedData.includeGamification ? '- Include gamification elements (XP points, achievements, streaks)' : ''}
 
-    Create ${validatedData.lessonCount} progressive lessons that build upon each other.
-    Each lesson should have:
-    1. A brief theory/explanation section
-    2. 3-5 interactive practice exercises (multiple choice, fill-in-blank, matching)
-    3. A quiz section
-    4. Clear learning objectives
+    🎯 CRITICAL: Create ${validatedData.lessonCount} COMPLETE, ENGAGING, progressive lessons that make learning "${validatedData.topic}" FUN and EFFECTIVE.
+    
+    ✨ MAKE IT MARKETABLE - Each lesson MUST have:
+    1. 📚 ENGAGING theory with real-world examples and stories (not boring!)
+    2. 🎮 8-12 INTERACTIVE exercises (multiple choice, fill-in-blank, matching, ordering, true/false)
+    3. 🎯 Mini-quiz after every 2-3 exercises (immediate feedback builds confidence)
+    4. 💡 Clear learning objectives (students see progress)
+    5. 🔑 Key terms with memorable examples
+    6. 💬 Encouraging feedback messages (make students feel smart!)
+    7. 🌟 Tips, tricks, and mnemonics (help memory retention)
+    
+    🚀 PROGRESSIVE LEARNING (One Step at a Time):
+    - Lesson 1: Start EASY - build confidence with basics
+    - Lessons 2-4: Gradually increase difficulty - layer new concepts
+    - Lessons 5-7: Intermediate challenges - combine previous knowledge
+    - Lessons 8-10: Advanced mastery - real-world application
+    - EACH lesson builds on previous ones - NO knowledge gaps!
+    
+    🌍 MAKE IT ATTRACTIVE TO PARENTS:
+    - Cover curriculum standards thoroughly
+    - Include practical, real-world applications
+    - Show clear learning progression
+    - Provide value worth paying for (better than expensive tutoring!)
+    - Use engaging, age-appropriate language for Grade ${validatedData.gradeLevel}
+    
+    🎓 LEARNING TYPES (Cover All Students):
+    - Visual learners: Rich examples and scenarios
+    - Kinesthetic learners: Interactive drag-drop, matching exercises
+    - Reading/writing learners: Fill-in-blanks, written exercises
+    - Auditory learners: Clear explanations with dialogue examples
+    
+    📊 COMPREHENSIVE COVERAGE:
+    For "${validatedData.topic}", ensure you cover:
+    - ALL variations, forms, rules, and exceptions
+    - Different contexts and applications
+    - Common mistakes and how to avoid them
+    - Real-world uses (newspapers, conversations, academic writing, etc.)
+    - Practice for different proficiency levels
+    
+    💎 QUALITY STANDARDS:
+    - Each lesson: 10-15 interactive steps minimum
+    - Mix of exercise types (never boring repetition)
+    - Immediate feedback with explanations (students learn from mistakes)
+    - Positive, encouraging tone (build confidence, not frustration)
+    - Professional quality (rival $50 Udemy courses!)
 
     Return as JSON with this structure:
     {
@@ -167,24 +197,56 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
       "badges": ["Beginner", "Intermediate", "Expert"]
     }`;
 
-    const completion = await openaiClient.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    const completion = await aiClient.chat.completions.create({
+      model: getAIModel(), // Uses OpenRouter format: "provider/model" (e.g., "openai/gpt-4o-mini")
       messages: [
         {
           role: 'system',
-          content: 'You are an expert educator creating interactive, engaging study modules similar to Duolingo. Focus on bite-sized, progressive learning with immediate feedback.',
+          content: 'You are a WORLD-CLASS educational content creator combining the best of Duolingo, Khan Academy, and Coursera. Create courses that parents will GLADLY PAY FOR and students will BEG to continue. Make learning addictive through gamification, clear progression, and immediate wins. Every exercise should make students feel smart. Use storytelling, real-world examples, and encouraging language. Design for ALL learning types. Your courses compete with $50-100 tutoring - make them worth it! Be thorough but FUN. Progressive difficulty that builds confidence step-by-step. Students should finish feeling accomplished, not exhausted.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.7,
-      max_tokens: 4000,
+      temperature: 0.8, // 0.8 = Balanced creativity - perfect for educational content with variety
+      max_tokens: 16384, // GPT-4o-mini ABSOLUTE MAXIMUM - generates the biggest, most comprehensive courses possible!
     });
 
     const aiResponse = completion.choices[0].message.content;
-    const moduleData = JSON.parse(aiResponse || '{}');
+    
+    if (!aiResponse) {
+      throw new Error('AI did not return any content');
+    }
+
+    console.log('📝 AI Response received, length:', aiResponse.length);
+    console.log('🔍 First 500 chars:', aiResponse.substring(0, 500));
+
+    // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+    let cleanedResponse = aiResponse.trim();
+    if (cleanedResponse.startsWith('```')) {
+      // Remove opening fence (```json or ```)
+      cleanedResponse = cleanedResponse.replace(/^```(?:json)?\n?/, '');
+      // Remove closing fence (```)
+      cleanedResponse = cleanedResponse.replace(/\n?```$/, '');
+      console.log('✂️ Stripped markdown code fences');
+    }
+
+    let moduleData;
+    try {
+      moduleData = JSON.parse(cleanedResponse);
+    } catch (parseError) {
+      console.error('❌ Failed to parse AI response:', parseError);
+      console.error('Raw AI response (first 1000 chars):', aiResponse.substring(0, 1000));
+      console.error('Cleaned response (first 1000 chars):', cleanedResponse.substring(0, 1000));
+      throw new Error('AI response was not valid JSON. Please try again.');
+    }
+
+    if (!moduleData.lessons || moduleData.lessons.length === 0) {
+      throw new Error('AI did not generate any lessons. Please try again with different parameters.');
+    }
+
+    console.log(`✅ AI generated ${moduleData.lessons.length} lessons with steps`);
 
     // Create study module with lessons and steps
     const studyModule = await prisma.studyModule.create({
@@ -240,15 +302,29 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
       },
     });
 
+    // Increment tier usage
+    await incrementTierUsage((req as any).user.id, 'CREATE_STUDY_MODULE');
+
+    console.log(`🎉 Study module created successfully: ${studyModule.title}`);
+    console.log(`📊 Contains ${studyModule.lessons.length} lessons with ${studyModule.lessons.reduce((sum, l) => sum + l.steps.length, 0)} total steps`);
+
     res.status(201).json({
       success: true,
       data: studyModule,
+      message: `Study module created with ${studyModule.lessons.length} lessons`,
     });
   } catch (error) {
-    console.error('Generate study module error:', error);
+    console.error('❌ Generate study module error:', error);
+    
+    // More detailed error logging
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Failed to generate study module',
+      message: error instanceof Error ? error.message : 'Failed to generate study module',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
@@ -795,6 +871,122 @@ export const getStudentProgress = async (req: Request, res: Response) => {
   }
 };
 
+// Update student progress (save current lesson/step position)
+export const updateModuleProgress = async (req: Request, res: Response) => {
+  try {
+    const { moduleId } = req.params;
+    const { currentLesson, currentStep, xpEarned = 0 } = req.body;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    console.log(`💾 Saving progress: Lesson ${currentLesson}, Step ${currentStep}`);
+
+    // Get module with lessons to calculate progress
+    const module = await prisma.studyModule.findUnique({
+      where: { id: moduleId },
+      include: {
+        lessons: {
+          include: { steps: true },
+          orderBy: { lessonNumber: 'asc' },
+        },
+      },
+    });
+
+    if (!module) {
+      return res.status(404).json({
+        success: false,
+        message: 'Module not found',
+      });
+    }
+
+    // Update assignment
+    const assignment = await prisma.studyModuleAssignment.findFirst({
+      where: {
+        moduleId,
+        studentId: (req as any).user.id,
+      },
+    });
+
+    if (!assignment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Assignment not found',
+      });
+    }
+
+    // Calculate overall progress
+    const totalLessons = module.lessons.length;
+    const totalSteps = module.lessons.reduce((sum, lesson) => sum + lesson.steps.length, 0);
+    
+    // Calculate completed steps (all steps before current position)
+    let completedSteps = 0;
+    for (let i = 0; i < currentLesson - 1; i++) {
+      const lesson = module.lessons.find(l => l.lessonNumber === i + 1);
+      if (lesson) {
+        completedSteps += lesson.steps.length;
+      }
+    }
+    // Add steps completed in current lesson
+    completedSteps += currentStep - 1;
+    
+    const overallProgress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+    
+    console.log(`📊 Progress calculation: ${completedSteps}/${totalSteps} steps = ${overallProgress}%`);
+
+    // Update assignment progress
+    await prisma.studyModuleAssignment.update({
+      where: { id: assignment.id },
+      data: {
+        currentLesson,
+        currentStep,
+        overallProgress,
+        totalXp: assignment.totalXp + xpEarned,
+        lastActiveAt: new Date(),
+      },
+    });
+
+    // Update progress record
+    const progress = await prisma.studyProgress.findFirst({
+      where: {
+        moduleId,
+        studentId: (req as any).user.id,
+      },
+    });
+
+    if (progress) {
+      await prisma.studyProgress.update({
+        where: { id: progress.id },
+        data: {
+          currentLessonNumber: currentLesson,
+          currentStepNumber: currentStep,
+          totalXP: progress.totalXP + xpEarned,
+          lastAccessedAt: new Date(),
+        },
+      });
+    }
+
+    console.log(`✅ Progress saved successfully`);
+
+    res.json({
+      success: true,
+      message: 'Progress saved',
+      data: {
+        currentLesson,
+        currentStep,
+        totalXp: assignment.totalXp + xpEarned,
+      },
+    });
+  } catch (error) {
+    console.error('Update progress error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update progress',
+    });
+  }
+};
+
 // Get leaderboard for a module
 export const getModuleLeaderboard = async (req: Request, res: Response) => {
   try {
@@ -840,6 +1032,244 @@ export const getModuleLeaderboard = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch leaderboard',
+    });
+  }
+};
+
+// Publish study module
+export const publishStudyModule = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const module = await prisma.studyModule.findUnique({
+      where: { id },
+    });
+
+    if (!module) {
+      return res.status(404).json({
+        success: false,
+        message: 'Study module not found',
+      });
+    }
+
+    if (module.createdBy !== (req as any).user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only publish your own modules',
+      });
+    }
+
+    const updatedModule = await prisma.studyModule.update({
+      where: { id },
+      data: { status: 'PUBLISHED' },
+    });
+
+    res.json({
+      success: true,
+      data: updatedModule,
+      message: 'Module published successfully',
+    });
+  } catch (error) {
+    console.error('Publish module error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to publish module',
+    });
+  }
+};
+
+// Delete study module
+export const deleteStudyModule = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const module = await prisma.studyModule.findUnique({
+      where: { id },
+    });
+
+    if (!module) {
+      return res.status(404).json({
+        success: false,
+        message: 'Study module not found',
+      });
+    }
+
+    if (module.createdBy !== (req as any).user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only delete your own modules',
+      });
+    }
+
+    await prisma.studyModule.delete({
+      where: { id },
+    });
+
+    res.json({
+      success: true,
+      message: 'Module deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete module error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete module',
+    });
+  }
+};
+
+// Get module assignments (for assignment modal)
+export const getModuleAssignments = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const assignments = await prisma.studyModuleAssignment.findMany({
+      where: { moduleId: id },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.json({
+      success: true,
+      data: assignments,
+    });
+  } catch (error) {
+    console.error('Get module assignments error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch assignments',
+    });
+  }
+};
+
+// Get student progress for a module (Teacher/Parent view)
+export const getModuleStudentProgress = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const userRole = (req as any).user.role;
+    if (userRole !== 'TEACHER' && userRole !== 'PARENT') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only teachers and parents can view student progress',
+      });
+    }
+
+    // Get module details
+    const module = await prisma.studyModule.findUnique({
+      where: { id },
+    });
+
+    if (!module) {
+      return res.status(404).json({
+        success: false,
+        message: 'Module not found',
+      });
+    }
+
+    // Get all assignments for this module
+    const assignments = await prisma.studyModuleAssignment.findMany({
+      where: { moduleId: id },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    // Calculate statistics
+    const totalAssigned = assignments.length;
+    const completionRate =
+      totalAssigned > 0
+        ? Math.round(
+            (assignments.filter((a) => a.status === 'COMPLETED').length /
+              totalAssigned) *
+              100
+          )
+        : 0;
+    const averageProgress =
+      totalAssigned > 0
+        ? Math.round(
+            assignments.reduce((sum, a) => sum + a.overallProgress, 0) /
+              totalAssigned
+          )
+        : 0;
+    const studentsInProgress = assignments.filter(
+      (a) => a.status === 'IN_PROGRESS'
+    ).length;
+    const studentsCompleted = assignments.filter(
+      (a) => a.status === 'COMPLETED'
+    ).length;
+    const averageXp =
+      totalAssigned > 0
+        ? assignments.reduce((sum, a) => sum + a.totalXp, 0) / totalAssigned
+        : 0;
+
+    // Format student progress
+    const studentProgress = assignments.map((assignment) => ({
+      studentId: assignment.studentId,
+      studentName: assignment.student?.name || 'Unknown',
+      studentEmail: assignment.student?.email || '',
+      assignedAt: assignment.createdAt,
+      currentLesson: assignment.currentLesson,
+      currentStep: assignment.currentStep,
+      overallProgress: assignment.overallProgress,
+      totalXp: assignment.totalXp,
+      lives: assignment.lives,
+      status: assignment.status,
+      lastActiveAt: assignment.lastActiveAt,
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        module,
+        statistics: {
+          totalAssigned,
+          completionRate,
+          averageProgress,
+          studentsInProgress,
+          studentsCompleted,
+          averageXp,
+        },
+        studentProgress: studentProgress.sort((a, b) => b.overallProgress - a.overallProgress),
+      },
+    });
+  } catch (error) {
+    console.error('Get module student progress error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch student progress',
     });
   }
 };

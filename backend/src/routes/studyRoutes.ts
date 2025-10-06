@@ -9,7 +9,12 @@ import {
   startStudyModule,
   submitStepAnswer,
   getStudentProgress,
-  getModuleLeaderboard
+  updateModuleProgress,
+  getModuleLeaderboard,
+  publishStudyModule,
+  deleteStudyModule,
+  getModuleAssignments,
+  getModuleStudentProgress
 } from '../controllers/studyModuleController';
 import { checkTierLimit } from '../middleware/tierLimits';
 
@@ -63,6 +68,10 @@ router.get('/assignments', verifyToken, async (req, res) => {
 router.get('/', verifyToken, getStudyModules);
 router.post('/', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), checkTierLimit('CREATE_STUDY_MODULE'), createStudyModule);
 router.get('/:id', verifyToken, getStudyModule);
+router.post('/:id/publish', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), publishStudyModule);
+router.delete('/:id', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), deleteStudyModule);
+router.get('/:id/assignments', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), getModuleAssignments);
+router.get('/:id/student-progress', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), getModuleStudentProgress);
 router.post('/:id/assign', verifyToken, requireRole('PARENT', 'TEACHER'), assignStudyModule);
 
 // AI generation
@@ -72,6 +81,7 @@ router.post('/generate', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'),
 router.post('/:id/start', verifyToken, startStudyModule);
 router.post('/:moduleId/submit', verifyToken, submitStepAnswer);
 router.get('/:moduleId/progress', verifyToken, getStudentProgress);
+router.post('/:moduleId/progress', verifyToken, updateModuleProgress);
 
 // Gamification
 router.get('/:moduleId/leaderboard', verifyToken, getModuleLeaderboard);

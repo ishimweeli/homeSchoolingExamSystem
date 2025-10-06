@@ -48,6 +48,7 @@ interface ExamResult {
     };
     answer: any;
     finalScore: number;
+    aiFeedback?: string;
   }>;
 }
 
@@ -113,15 +114,25 @@ export default function ExamResults() {
     (a) => a.finalScore === a.question.marks
   ).length;
   const totalQuestions = result.answers.length;
+  
+  // Calculate actual score from answers if not provided
+  const actualScore = result.score || result.answers.reduce((sum, a) => sum + (a.finalScore || 0), 0);
+  const actualPercentage = result.percentage || (result.totalMarks > 0 ? (actualScore / result.totalMarks) * 100 : 0);
+  const actualGrade = typeof result.grade === 'string' ? result.grade : (result.grade as any)?.grade || 
+    (actualPercentage >= 90 ? 'A+' :
+     actualPercentage >= 80 ? 'A' :
+     actualPercentage >= 70 ? 'B' :
+     actualPercentage >= 60 ? 'C' :
+     actualPercentage >= 50 ? 'D' : 'F');
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
-      <Paper elevation={3} sx={{ p: 3, mb: 3, bgcolor: result.passed ? 'success.light' : 'error.light' }}>
+      <Paper elevation={3} sx={{ p: 3, mb: 3, bgcolor: actualPercentage >= (result.exam?.passingMarks || 50) ? 'success.light' : 'error.light' }}>
         <Box display="flex" alignItems="center" justifyContent="space-between">
           <Box>
             <Typography variant="h4" gutterBottom>
-              {result.passed ? '🎉 Congratulations!' : '📚 Keep Learning!'}
+              {actualPercentage >= (result.exam?.passingMarks || 50) ? '🎉 Congratulations!' : '📚 Keep Learning!'}
             </Typography>
             <Typography variant="h6" color="text.secondary">
               {result.exam.title}
@@ -132,11 +143,11 @@ export default function ExamResults() {
           </Box>
           <Box textAlign="center">
             <Typography variant="h2" fontWeight="bold">
-              {result.percentage?.toFixed(1) || 0}%
+              {actualPercentage.toFixed(1)}%
             </Typography>
             <Chip
-              label={result.passed ? 'PASSED' : 'FAILED'}
-              color={result.passed ? 'success' : 'error'}
+              label={actualPercentage >= (result.exam?.passingMarks || 50) ? 'PASSED' : 'FAILED'}
+              color={actualPercentage >= (result.exam?.passingMarks || 50) ? 'success' : 'error'}
             />
           </Box>
         </Box>
@@ -150,7 +161,7 @@ export default function ExamResults() {
               Score
             </Typography>
             <Typography variant="h4">
-              {result.score}/{result.totalMarks}
+              {actualScore}/{result.totalMarks}
             </Typography>
           </CardContent>
         </Card>
@@ -170,7 +181,7 @@ export default function ExamResults() {
               Grade
             </Typography>
             <Typography variant="h4">
-              {typeof result.grade === 'string' ? result.grade : result.grade?.grade || 'N/A'}
+              {actualGrade}
             </Typography>
           </CardContent>
         </Card>
@@ -264,6 +275,21 @@ export default function ExamResults() {
                         {answer.finalScore}/{answer.question.marks} marks
                       </Typography>
                     </Box>
+
+                    {/* AI Feedback for this question */}
+                    {answer.aiFeedback && (
+                      <Alert 
+                        severity={isCorrect ? 'success' : answer.finalScore > 0 ? 'warning' : 'error'} 
+                        sx={{ mt: 2 }}
+                      >
+                        <Typography variant="body2" fontWeight="medium" gutterBottom>
+                          💬 Feedback:
+                        </Typography>
+                        <Typography variant="body2">
+                          {answer.aiFeedback}
+                        </Typography>
+                      </Alert>
+                    )}
                   </Box>
                 </Box>
               </Box>

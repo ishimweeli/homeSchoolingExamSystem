@@ -41,11 +41,21 @@ export const gradeExamWithAI = async (
 Grading Guidelines:
 - Multiple Choice: 0 or full marks only (exact match)
 - True/False: 0 or full marks only (exact match)
-- Short Answer: Can give partial credit for partially correct answers, consider synonyms and variations
-- Long Answer/Essay: Grade based on completeness, accuracy, understanding, and key points covered
-- Fill in Blanks: Can give partial credit if close to correct (spelling variations, synonyms)
+- Short Answer: Give PARTIAL credit based on:
+  * Full marks if meaning is correct (minor case/punctuation issues ok)
+  * -10% to -20% of marks for capitalization errors ONLY if it affects meaning (e.g., proper nouns)
+  * -10% for minor punctuation issues
+  * Partial credit (30-70%) for partially correct content
+  * Consider synonyms and variations
+  * EXPLAIN in feedback what caused deduction
+- Long Answer/Essay: Grade based on completeness, accuracy, understanding, and key points covered. Give partial credit generously.
+- Fill in Blanks: 
+  * Full marks if correct (ignore case/punctuation for common words)
+  * -10% to -20% for capitalization of proper nouns
+  * Partial credit for spelling variations or synonyms
+  * EXPLAIN in feedback
 
-Be fair and encouraging in your feedback. Recognize effort and partial understanding.
+Be fair, encouraging, and DETAILED in your feedback. Always explain why marks were deducted and what was expected.
 
 Questions to grade:
 ${JSON.stringify(questionsToGrade, null, 2)}
@@ -129,6 +139,7 @@ export const submitExamWithAIGrading = async (req: Request, res: Response) => {
       aiGradingUsed = true;
 
       // Process AI grading results
+      console.log('AI Grading Results:', JSON.stringify(aiResults, null, 2));
       for (const question of attempt.exam.questions) {
         const aiResult = aiResults.find((r: any) => r.questionId === question.id) || {
           score: 0,
@@ -138,6 +149,7 @@ export const submitExamWithAIGrading = async (req: Request, res: Response) => {
         };
 
         const studentAnswer = answerMap[question.id] || '';
+        console.log(`Question ${question.id}: AI Score = ${aiResult.score}, Max = ${aiResult.maxScore}`);
         totalScore += aiResult.score;
 
         gradingResults.push({
@@ -203,7 +215,10 @@ export const submitExamWithAIGrading = async (req: Request, res: Response) => {
     });
 
     // Calculate final grade
-    const percentage = (totalScore / attempt.exam.totalMarks) * 100;
+    console.log('Total Score:', totalScore);
+    console.log('Total Marks:', attempt.exam.totalMarks);
+    const percentage = attempt.exam.totalMarks > 0 ? (totalScore / attempt.exam.totalMarks) * 100 : 0;
+    console.log('Calculated Percentage:', percentage);
     const grade =
       percentage >= 90 ? 'A+' :
       percentage >= 80 ? 'A' :
@@ -220,6 +235,19 @@ export const submitExamWithAIGrading = async (req: Request, res: Response) => {
         timeSpent: Math.round((Date.now() - attempt.startedAt.getTime()) / 60000),
         isGraded: true
       },
+    });
+
+    // Increment attempts used in the assignment
+    await prisma.examAssignment.updateMany({
+      where: {
+        examId: attempt.examId,
+        studentId: attempt.studentId
+      },
+      data: {
+        attemptsUsed: {
+          increment: 1
+        }
+      }
     });
 
     // Save grade
