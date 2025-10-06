@@ -11,6 +11,7 @@ interface Tier {
   maxExams: number;
   maxStudyModules: number;
   maxStudents: number;
+  totalAttemptsPool: number;  // Total attempts teacher can distribute
   price: number;
   currency: string;
   validityDays: number;
@@ -33,6 +34,7 @@ interface UserTier {
   examsCreated: number;
   studyModulesCreated: number;
   studentsCreated: number;
+  attemptsUsed: number;  // Track attempts used from pool
   assignedAt: string;
   expiresAt?: string;
   isActive: boolean;
@@ -67,6 +69,7 @@ export default function AdminTiers() {
     maxExams: 10,
     maxStudyModules: 10,
     maxStudents: 50,
+    totalAttemptsPool: 100,  // Default 100 attempts
     price: 0,
     currency: 'USD',
     validityDays: 30,
@@ -151,6 +154,7 @@ export default function AdminTiers() {
           maxExams: 10,
           maxStudyModules: 10,
           maxStudents: 50,
+          totalAttemptsPool: 100,
           price: 0,
           currency: 'USD',
           validityDays: 30,
@@ -399,6 +403,12 @@ export default function AdminTiers() {
                       {tier.maxStudents === 999999 ? 'Unlimited' : tier.maxStudents} students
                     </span>
                   </div>
+                  <div className="flex items-center gap-2 bg-purple-50 p-2 rounded-lg border border-purple-200">
+                    <Check className="w-4 h-4 text-purple-600 font-bold" />
+                    <span className="text-sm font-bold text-purple-900">
+                      🎯 {tier.totalAttemptsPool === 999999 ? 'Unlimited' : tier.totalAttemptsPool} total attempts
+                    </span>
+                  </div>
                 </div>
 
                 <p className="text-sm text-gray-500">{tier.description || 'No description'}</p>
@@ -466,12 +476,18 @@ export default function AdminTiers() {
                       <div>Exams: {userTier.examsCreated}/{userTier.tier.maxExams}</div>
                       <div>Modules: {userTier.studyModulesCreated}/{userTier.tier.maxStudyModules}</div>
                       <div>Students: {userTier.studentsCreated}/{userTier.tier.maxStudents}</div>
+                      <div className="font-bold text-purple-900 bg-purple-50 px-2 py-1 rounded mt-1">
+                        🎯 Attempts: {userTier.attemptsUsed || 0}/{userTier.tier.totalAttemptsPool}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <div>Exams: {Math.max(0, userTier.tier.maxExams - userTier.examsCreated)}</div>
                     <div>Modules: {Math.max(0, userTier.tier.maxStudyModules - userTier.studyModulesCreated)}</div>
                     <div>Students: {Math.max(0, userTier.tier.maxStudents - userTier.studentsCreated)}</div>
+                    <div className="font-bold text-purple-900 bg-purple-50 px-2 py-1 rounded mt-1">
+                      🎯 {Math.max(0, userTier.tier.totalAttemptsPool - (userTier.attemptsUsed || 0))} attempts left
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {userTier.isActive ? (
@@ -684,6 +700,26 @@ export default function AdminTiers() {
                   />
                   <p className="text-xs text-gray-500 mt-1">0 = unlimited</p>
                 </div>
+              </div>
+
+              {/* Total Attempts Pool - MOST IMPORTANT */}
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
+                <label className="block text-sm font-bold text-purple-900 mb-2">
+                  Total Attempts Pool * 🎯
+                </label>
+                <input
+                  type="number"
+                  value={newTier.totalAttemptsPool || 0}
+                  onChange={(e) => setNewTier({...newTier, totalAttemptsPool: parseInt(e.target.value) || 0})}
+                  min="0"
+                  className="w-full px-4 py-3 border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-semibold text-lg"
+                  placeholder="e.g., 100"
+                />
+                <p className="text-sm text-purple-700 mt-2 font-medium">
+                  Total attempts teacher can distribute to students across ALL exams and modules. 
+                  <br/>
+                  <span className="text-xs">Example: Assign 2 attempts to 5 students = 10 attempts used from pool</span>
+                </p>
               </div>
 
               {/* Pricing */}

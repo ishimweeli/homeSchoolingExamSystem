@@ -178,6 +178,19 @@ export const generateExamWithAI = async (req: Request, res: Response) => {
       });
     }
     
+    // Check if it's an OpenRouter authentication error
+    if (error instanceof Error) {
+      const errorMessage = error.message.toLowerCase();
+      
+      if (errorMessage.includes('401') || errorMessage.includes('unauthorized') || errorMessage.includes('user not found')) {
+        return res.status(503).json({
+          success: false,
+          message: '🔑 OpenRouter API key is invalid or has no credits. Please add credits at https://openrouter.ai/ or contact support.',
+          details: 'The AI service requires a valid API key with available credits to generate exams.'
+        });
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : 'Failed to generate exam',
@@ -368,7 +381,7 @@ export const getExamAssignments = async (req: Request, res: Response) => {
 export const assignExam = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { studentIds, dueDate, maxAttempts = 1 } = req.body;
+    const { studentIds, dueDate, maxAttempts = 2 } = req.body; // Default 2 attempts per student
 
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -383,6 +396,23 @@ export const assignExam = async (req: Request, res: Response) => {
       return res.status(403).json({
         success: false,
         message: 'You can only assign your own exams',
+      });
+    }
+
+    // Calculate total attempts needed
+    const totalAttemptsNeeded = studentIds.length * maxAttempts;
+
+    // Check if teacher has enough attempts in their pool
+    const { checkAttemptPool, deductAttempts } = require('../middleware/tierLimits');
+    const attemptCheck = await checkAttemptPool((req as any).user.id, totalAttemptsNeeded);
+
+    if (!attemptCheck.canAssign) {
+      return res.status(403).json({
+        success: false,
+        message: attemptCheck.message || 'Insufficient attempts in your pool',
+        error: attemptCheck.message,
+        attemptsNeeded: totalAttemptsNeeded,
+        attemptsRemaining: attemptCheck.remaining
       });
     }
 
@@ -439,10 +469,18 @@ export const assignExam = async (req: Request, res: Response) => {
       })),
     });
 
+    // Deduct attempts from teacher's pool
+    await deductAttempts((req as any).user.id, totalAttemptsNeeded);
+
     res.json({
       success: true,
-      message: `Exam assigned to ${assignments.count} students`,
-      data: assignments,
+      message: `Exam assigned to ${assignments.count} students (${maxAttempts} attempts each, ${totalAttemptsNeeded} attempts used from pool)`,
+      data: { 
+        count: assignments.count, 
+        maxAttempts,
+        totalAttemptsUsed: totalAttemptsNeeded,
+        attemptsRemaining: attemptCheck.remaining - totalAttemptsNeeded
+      },
     });
   } catch (error) {
     console.error('Assign exam error:', error);
@@ -494,23 +532,17 @@ export const startExamAttempt = async (req: Request, res: Response) => {
         examId: id,
         studentId: (req as any).user.id,
         isCompleted: false,
+        submittedAt: null, // Ensure it's truly not submitted
       },
     });
 
     // If no incomplete attempt, check if max attempts reached
     if (!attempt) {
-      const attemptCount = await prisma.examAttempt.count({
-        where: {
-          examId: id,
-          studentId: (req as any).user.id,
-          isCompleted: true,
-        },
-      });
-
-      if (attemptCount >= assignment.maxAttempts) {
+      // Check attempts used from assignment (more reliable than counting)
+      if (assignment.attemptsUsed >= assignment.maxAttempts) {
         return res.status(403).json({
           success: false,
-          message: `Maximum attempts reached (${assignment.maxAttempts} allowed)`,
+          message: `Maximum attempts reached (${assignment.maxAttempts} allowed, ${assignment.attemptsUsed} used)`,
         });
       }
 
@@ -602,7 +634,7 @@ export const submitExam = async (req: Request, res: Response) => {
         }
       }
 
-      const isCorrect = String(studentAnswer).toLowerCase() === String(correctAnswer).toLowerCase();
+      const isCorrect = String(studentAnswer).toLowerCase().trim() === String(correctAnswer).toLowerCase().trim();
       const marksAwarded = isCorrect ? question.marks : 0;
       totalScore += marksAwarded;
 
@@ -633,6 +665,19 @@ export const submitExam = async (req: Request, res: Response) => {
         submittedAt: new Date(),
         timeSpent: Math.round((Date.now() - attempt.startedAt.getTime()) / 60000), // convert to minutes
       },
+    });
+
+    // Increment attempts used in the assignment
+    await prisma.examAssignment.updateMany({
+      where: {
+        examId: id,
+        studentId: (req as any).user.id
+      },
+      data: {
+        attemptsUsed: {
+          increment: 1
+        }
+      }
     });
 
     await prisma.grade.create({
@@ -722,6 +767,169 @@ export const getExamResults = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch results',
+    });
+  }
+};
+
+// Unassign student from exam and refund attempts
+export const unassignExam = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;  // exam ID
+    const { studentId } = req.body;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // Check if user owns the exam
+    const exam = await prisma.exam.findUnique({
+      where: { id },
+    });
+
+    if (!exam || exam.creatorId !== (req as any).user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only unassign your own exams',
+      });
+    }
+
+    // Find the assignment
+    const assignment = await prisma.examAssignment.findFirst({
+      where: {
+        examId: id,
+        studentId,
+        assignedBy: (req as any).user.id,
+      },
+    });
+
+    if (!assignment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Assignment not found',
+      });
+    }
+
+    // Count how many attempts the student actually used
+    const attempts = await prisma.examAttempt.findMany({
+      where: {
+        examId: id,
+        studentId,
+      },
+      select: { id: true },
+    });
+
+    const attemptsUsed = attempts.length;
+    const attemptsAllocated = assignment.maxAttempts;
+    const attemptsToRefund = Math.max(0, attemptsAllocated - attemptsUsed);
+
+    // Delete answers first (due to foreign key)
+    for (const attempt of attempts) {
+      await prisma.answer.deleteMany({
+        where: { attemptId: attempt.id },
+      });
+      await prisma.grade.deleteMany({
+        where: { attemptId: attempt.id },
+      });
+    }
+
+    // Delete attempts
+    await prisma.examAttempt.deleteMany({
+      where: {
+        examId: id,
+        studentId,
+      },
+    });
+
+    // Delete the assignment
+    await prisma.examAssignment.delete({
+      where: { id: assignment.id },
+    });
+
+    // Refund only UNUSED attempts back to teacher's pool
+    const { refundAttempts } = require('../middleware/tierLimits');
+    if (attemptsToRefund > 0) {
+      await refundAttempts((req as any).user.id, attemptsToRefund);
+    }
+
+    res.json({
+      success: true,
+      message: attemptsToRefund > 0 
+        ? `Student unassigned. ${attemptsUsed} attempts used, ${attemptsToRefund} unused attempts refunded to your pool`
+        : `Student unassigned. All ${attemptsUsed} attempts were used, none refunded`,
+      data: {
+        attemptsAllocated,
+        attemptsUsed,
+        attemptsRefunded: attemptsToRefund,
+      },
+    });
+  } catch (error) {
+    console.error('Unassign exam error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to unassign exam',
+    });
+  }
+};
+
+// Get all attempts for a specific exam by the current user
+export const getExamAttempts = async (req: Request, res: Response) => {
+  try {
+    const { examId } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const userId = (req as any).user.id;
+
+    // Get all attempts for this exam by this user
+    const attempts = await prisma.examAttempt.findMany({
+      where: {
+        examId,
+        studentId: userId,
+        isCompleted: true,
+      },
+      include: {
+        grade: true,
+        exam: {
+          select: {
+            id: true,
+            title: true,
+            subject: true,
+            totalMarks: true,
+            passingMarks: true,
+          },
+        },
+      },
+      orderBy: {
+        submittedAt: 'desc',
+      },
+    });
+
+    // Get assignment to know max attempts allowed
+    const assignment = await prisma.examAssignment.findFirst({
+      where: {
+        examId,
+        studentId: userId,
+      },
+      select: {
+        maxAttempts: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        attempts,
+        maxAttempts: assignment?.maxAttempts || 1,
+        attemptCount: attempts.length,
+      },
+    });
+  } catch (error) {
+    console.error('Get exam attempts error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch exam attempts',
     });
   }
 };
@@ -897,6 +1105,252 @@ export const updateExam = async (req: Request, res: Response) => {
       success: false,
       message: error instanceof z.ZodError ? 'Validation error' : 'Failed to update exam',
       errors: error instanceof z.ZodError ? error.errors : undefined,
+    });
+  }
+};
+
+// ADVANCED MODE: Generate exam with sections
+export const generateAdvancedExam = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const { generateAdvancedExam: generateExam } = await import('../services/advancedExamGenerator');
+
+    const exam = await generateExam(req.body, (req as any).user.id);
+
+    // Track tier usage
+    await incrementTierUsage((req as any).user.id, 'CREATE_EXAM');
+
+    res.json({
+      success: true,
+      data: exam,
+      message: 'Advanced exam generated successfully',
+    });
+  } catch (error: any) {
+    console.error('Advanced exam generation error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate advanced exam',
+    });
+  }
+};
+
+// PDF Upload: Recreate exam from uploaded PDF
+export const recreateFromPDF = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const { pdfText } = req.body;
+
+    if (!pdfText) {
+      return res.status(400).json({ success: false, message: 'PDF text is required' });
+    }
+
+    const { recreateExamFromPDF } = await import('../services/advancedExamGenerator');
+
+    const exam = await recreateExamFromPDF(pdfText, (req as any).user.id);
+
+    // Track tier usage
+    await incrementTierUsage((req as any).user.id, 'CREATE_EXAM');
+
+    res.json({
+      success: true,
+      data: exam,
+      message: 'Exam recreated from PDF successfully',
+    });
+  } catch (error: any) {
+    console.error('PDF recreation error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to recreate exam from PDF',
+    });
+  }
+};
+
+// Get all student results for a specific exam (for teachers/parents)
+export const getExamStudentResults = async (req: Request, res: Response) => {
+  try {
+    const { examId } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const userRole = (req as any).user.role;
+    
+    // Only teachers and parents can access this
+    if (userRole !== 'TEACHER' && userRole !== 'PARENT') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Only teachers and parents can view student results' 
+      });
+    }
+
+    // Get exam details
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      select: {
+        id: true,
+        title: true,
+        subject: true,
+        gradeLevel: true,
+        totalMarks: true,
+        passingMarks: true,
+        duration: true,
+        _count: {
+          select: {
+            questions: true,
+          },
+        },
+      },
+    });
+
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Exam not found',
+      });
+    }
+
+    // Get all assignments for this exam
+    const assignments = await prisma.examAssignment.findMany({
+      where: { examId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    // Get all attempts for this exam
+    const allAttempts = await prisma.examAttempt.findMany({
+      where: {
+        examId,
+        isCompleted: true,
+        submittedAt: { not: null },
+      },
+      include: {
+        grade: true,
+      },
+      orderBy: {
+        submittedAt: 'desc',
+      },
+    });
+
+    // Map attempts to assignments
+    const assignmentMap = new Map(
+      assignments.map(a => [a.studentId, {
+        ...a,
+        attempts: allAttempts.filter(attempt => attempt.studentId === a.studentId)
+      }])
+    );
+
+    // Calculate statistics
+    const totalAssigned = assignments.length;
+    const studentsCompleted = Array.from(assignmentMap.values()).filter(a => a.attempts.length > 0).length;
+    const completionRate = totalAssigned > 0 ? (studentsCompleted / totalAssigned) * 100 : 0;
+
+    // Get all scores
+    const allScores = allAttempts
+      .map(attempt => {
+        const percentage = attempt.grade?.percentage || 0;
+        return percentage;
+      })
+      .filter(score => score > 0);
+
+    const averageScore = allScores.length > 0 
+      ? allScores.reduce((sum, score) => sum + score, 0) / allScores.length 
+      : 0;
+
+    const passedCount = allScores.filter(score => score >= exam.passingMarks).length;
+    const passRate = allScores.length > 0 ? (passedCount / allScores.length) * 100 : 0;
+
+    const highestScore = allScores.length > 0 ? Math.max(...allScores) : 0;
+    const lowestScore = allScores.length > 0 ? Math.min(...allScores) : 0;
+
+    // Format student results
+    const studentResults = Array.from(assignmentMap.values()).map(assignment => {
+      const studentAttempts = assignment.attempts;
+      const bestAttempt = studentAttempts.length > 0 
+        ? studentAttempts.reduce((best, current) => {
+            const currentScore = current.grade?.totalScore || 0;
+            const bestScore = best.grade?.totalScore || 0;
+            return currentScore > bestScore ? current : best;
+          })
+        : null;
+
+      const attemptScore = bestAttempt?.grade?.totalScore || 0;
+      const percentage = bestAttempt?.grade?.percentage || 0;
+
+      return {
+        studentId: assignment.student?.id || '',
+        studentName: assignment.student?.name || 'Unknown',
+        studentEmail: assignment.student?.email || '',
+        assignedAt: assignment.createdAt,
+        maxAttempts: assignment.maxAttempts,
+        attemptsUsed: assignment.attemptsUsed || 0,
+        totalAttempts: studentAttempts.length,
+        status: studentAttempts.length > 0 ? 'COMPLETED' : 'NOT_STARTED',
+        bestScore: attemptScore,
+        bestPercentage: percentage,
+        bestGrade: bestAttempt?.grade?.grade || 
+          (percentage >= 90 ? 'A+' :
+           percentage >= 80 ? 'A' :
+           percentage >= 70 ? 'B' :
+           percentage >= 60 ? 'C' :
+           percentage >= 50 ? 'D' : 'F'),
+        passed: percentage >= exam.passingMarks,
+        lastAttemptDate: bestAttempt?.submittedAt || null,
+        attempts: studentAttempts.map(attempt => ({
+          id: attempt.id,
+          score: attempt.grade?.totalScore || 0,
+          percentage: attempt.grade?.percentage || 0,
+          grade: attempt.grade?.grade || 'N/A',
+          submittedAt: attempt.submittedAt,
+          timeSpent: attempt.timeSpent,
+        })),
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        exam: {
+          ...exam,
+          questionCount: exam._count.questions,
+        },
+        statistics: {
+          totalAssigned,
+          studentsCompleted,
+          completionRate: Math.round(completionRate * 10) / 10,
+          averageScore: Math.round(averageScore * 10) / 10,
+          passRate: Math.round(passRate * 10) / 10,
+          highestScore: Math.round(highestScore * 10) / 10,
+          lowestScore: Math.round(lowestScore * 10) / 10,
+          totalAttempts: allScores.length,
+        },
+        studentResults: studentResults.sort((a, b) => {
+          // Sort by status (completed first), then by score (highest first)
+          if (a.status !== b.status) {
+            return a.status === 'COMPLETED' ? -1 : 1;
+          }
+          return b.bestPercentage - a.bestPercentage;
+        }),
+      },
+    });
+  } catch (error) {
+    console.error('Get exam student results error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch student results',
     });
   }
 };

@@ -6,6 +6,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 class ApiService {
   private instance: AxiosInstance;
   private refreshPromise: Promise<string> | null = null;
+  private tokenCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private onTokenExpiredCallback: (() => void) | null = null;
 
   constructor() {
     this.instance = axios.create({
@@ -16,6 +18,14 @@ class ApiService {
     });
 
     this.setupInterceptors();
+    this.initTokenValidation();
+  }
+
+  /**
+   * Register a callback to be called when tokens expire
+   */
+  public onTokenExpired(callback: () => void): void {
+    this.onTokenExpiredCallback = callback;
   }
 
   private setupInterceptors() {
@@ -102,6 +112,91 @@ class ApiService {
   private clearTokens(): void {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
+    this.stopTokenValidation();
+    
+    // Notify subscribers about token expiration
+    if (this.onTokenExpiredCallback) {
+      this.onTokenExpiredCallback();
+    }
+  }
+
+  /**
+   * Decode JWT token without verification (client-side only)
+   */
+  private decodeToken(token: string): any {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Check if a token is expired
+   */
+  private isTokenExpired(token: string | null): boolean {
+    if (!token) return true;
+
+    const decoded = this.decodeToken(token);
+    if (!decoded || !decoded.exp) return true;
+
+    // Check if token is expired (with 30 second buffer)
+    const currentTime = Math.floor(Date.now() / 1000);
+    return decoded.exp < currentTime + 30;
+  }
+
+  /**
+   * Initialize token validation and periodic checking
+   */
+  private initTokenValidation(): void {
+    // Check tokens on initialization
+    this.validateTokens();
+
+    // Check tokens every minute
+    this.tokenCheckInterval = setInterval(() => {
+      this.validateTokens();
+    }, 60000); // 60 seconds
+  }
+
+  /**
+   * Stop token validation interval
+   */
+  private stopTokenValidation(): void {
+    if (this.tokenCheckInterval) {
+      clearInterval(this.tokenCheckInterval);
+      this.tokenCheckInterval = null;
+    }
+  }
+
+  /**
+   * Validate stored tokens and clear if expired
+   */
+  private validateTokens(): void {
+    const token = this.getToken();
+    const refreshToken = this.getRefreshToken();
+
+    // If access token is expired, check refresh token
+    if (this.isTokenExpired(token)) {
+      // If refresh token is also expired, clear everything
+      if (this.isTokenExpired(refreshToken)) {
+        console.log('Tokens expired, clearing authentication');
+        this.clearTokens();
+        // Trigger logout in auth store
+        if (window.location.pathname !== '/login' && 
+            window.location.pathname !== '/register' &&
+            !window.location.pathname.startsWith('/auth/')) {
+          window.location.href = '/login';
+        }
+      }
+    }
   }
 
   // Auth methods
@@ -223,6 +318,11 @@ class ApiService {
     return res.data.data;
   }
 
+  async getAssignedExams() {
+    const res = await this.instance.get('/students/assigned-exams');
+    return res.data.data;
+  }
+
   async getExam(id: string) {
     const res = await this.instance.get(`/exams/${id}`);
     return res.data.data;
@@ -230,6 +330,11 @@ class ApiService {
 
   async listStudyModules(params?: any) {
     const res = await this.instance.get('/study-modules', { params });
+    return res.data.data;
+  }
+
+  async getAssignedModules() {
+    const res = await this.instance.get('/study-modules/assignments');
     return res.data.data;
   }
 

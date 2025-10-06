@@ -10,6 +10,11 @@ let openRouterClient: OpenAI | null = null;
 export const getAIClient = (): OpenAI | null => {
   const apiKey = process.env.OPENROUTER_API_KEY;
   
+  // Debug logging
+  console.log('🔑 OpenRouter API Key Status:', apiKey ? `Found (${apiKey.substring(0, 15)}...)` : '❌ MISSING!');
+  console.log('🌐 Base URL:', 'https://openrouter.ai/api/v1');
+  console.log('🤖 Model:', process.env.AI_MODEL || 'openai/gpt-4o-mini');
+  
   if (!openRouterClient && apiKey) {
     openRouterClient = new OpenAI({
       apiKey: apiKey,
@@ -19,6 +24,7 @@ export const getAIClient = (): OpenAI | null => {
         'X-Title': process.env.SITE_NAME || 'HomeSchool Exam System',
       },
     });
+    console.log('✅ OpenRouter client initialized successfully');
   }
   
   return openRouterClient;

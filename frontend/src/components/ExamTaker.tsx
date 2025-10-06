@@ -488,11 +488,11 @@ export const ExamTaker: React.FC = () => {
                     <Button
                       variant="contained"
                       color="success"
-                      endIcon={<SubmitIcon />}
+                      endIcon={submitting ? <CircularProgress size={20} color="inherit" /> : <SubmitIcon />}
                       onClick={handleSubmitClick}
                       disabled={submitting}
                     >
-                      Submit Exam
+                      {submitting ? 'Submitting...' : 'Submit Exam'}
                     </Button>
                   ) : (
                     <Button

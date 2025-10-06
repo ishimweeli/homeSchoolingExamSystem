@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   BookOpen, Users, FileText, Brain, BarChart3, Settings,
-  LogOut, Menu, X, Home, Plus, Calendar, Award, TrendingUp,
+  LogOut, Menu, X, Home, Calendar, Award, TrendingUp,
   Clock, CheckCircle, AlertCircle, Sparkles, User, GraduationCap,
   BookMarked, Activity, Target, Zap, Search, Filter, ChevronRight,
   Edit, Trash2, Eye, Download, Upload, RefreshCw, ArrowUp, ArrowDown,
-  PenTool, UserPlus, FolderOpen, MoreVertical, ChevronDown, CreditCard
+  PenTool, FolderOpen, MoreVertical, ChevronDown, CreditCard
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -91,29 +91,12 @@ export default function Layout({ children }: LayoutProps) {
   const currentItem = sidebarItems.find(item => isActiveRoute(item.path));
   const pageTitle = currentItem?.label || 'Dashboard';
 
-  const canCreate = user?.role === 'TEACHER' || user?.role === 'ADMIN';
-
   const handleRefresh = () => {
     try {
       // Simple full refresh to re-fetch page data
       window.location.reload();
     } catch (_) {
       // no-op
-    }
-  };
-
-  const handlePrimaryAction = () => {
-    if (location.pathname.startsWith('/exams')) {
-      navigate('/exams/create');
-      return;
-    }
-    if (location.pathname.startsWith('/modules')) {
-      navigate('/modules/create');
-      return;
-    }
-    if (location.pathname.startsWith('/students')) {
-      navigate('/students');
-      return;
     }
   };
 
@@ -172,38 +155,6 @@ export default function Layout({ children }: LayoutProps) {
               );
             })}
           </ul>
-
-          {/* Quick Actions - only show for teachers/admins */}
-          {(user?.role === 'TEACHER' || user?.role === 'ADMIN') && sidebarOpen && (
-            <div className="mt-8">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                Quick Actions
-              </h3>
-              <div className="space-y-2">
-                <button
-                  onClick={() => navigate('/exams/create')}
-                  className="w-full flex items-center px-4 py-2.5 text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-600 rounded-lg transition-colors"
-                >
-                  <Plus className="w-4 h-4 mr-3" />
-                  Create Exam
-                </button>
-                <button
-                  onClick={() => navigate('/modules/create')}
-                  className="w-full flex items-center px-4 py-2.5 text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-600 rounded-lg transition-colors"
-                >
-                  <BookOpen className="w-4 h-4 mr-3" />
-                  Create Module
-                </button>
-                <button
-                  onClick={() => navigate('/students')}
-                  className="w-full flex items-center px-4 py-2.5 text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-600 rounded-lg transition-colors"
-                >
-                  <UserPlus className="w-4 h-4 mr-3" />
-                  Manage Students
-                </button>
-              </div>
-            </div>
-          )}
         </nav>
       </div>
 
@@ -224,15 +175,6 @@ export default function Layout({ children }: LayoutProps) {
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
-              {canCreate && (location.pathname.startsWith('/exams') || location.pathname.startsWith('/modules')) && (
-                <button
-                  onClick={handlePrimaryAction}
-                  className="px-3 md:px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 text-sm font-medium"
-                >
-                  <span className="hidden md:inline">Create</span>
-                  <span className="md:hidden">+</span>
-                </button>
-              )}
               
               {/* User Profile Dropdown */}
               <div className="relative" ref={menuRef}>

@@ -55,7 +55,15 @@ export default function ModuleView() {
   const fetchModule = async () => {
     try {
       const response = await api.get(`/study-modules/${id}`);
-      setModule(response.data);
+      const moduleData = response.data?.data || response.data;
+
+      // Ensure topics is always an array
+      if (moduleData) {
+        moduleData.topics = Array.isArray(moduleData.topics) ? moduleData.topics : [];
+        setModule(moduleData);
+      } else {
+        setModule(mockModule);
+      }
     } catch (error) {
       console.error('Error fetching module:', error);
       // Use mock data for demo
@@ -145,8 +153,8 @@ export default function ModuleView() {
   };
 
   const handleStartModule = () => {
-    setIsEnrolled(true);
-    setCurrentLesson(0);
+    // Navigate to interactive module taker
+    navigate(`/modules/${id}/take`);
   };
 
   const handleLessonClick = (index: number) => {

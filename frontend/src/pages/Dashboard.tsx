@@ -159,18 +159,61 @@ const Dashboard: React.FC = () => {
 
   const fetchExams = async () => {
     try {
-      const data = await api.listExams();
+      let data;
+      if (user?.role === 'STUDENT') {
+        // For students, fetch assigned exams
+        const assignments = await api.getAssignedExams();
+        // Transform assignments to exam format
+        data = Array.isArray(assignments) ? assignments.map((a: any) => ({
+          id: a.exam?.id || a.id,
+          title: a.exam?.title || a.title,
+          subject: a.exam?.subject || a.subject,
+          grade: a.exam?.gradeLevel || a.gradeLevel,
+          status: 'PUBLISHED',
+          createdAt: a.createdAt,
+          questions: a.exam?._count?.questions || 0,
+          duration: a.exam?.duration || 0,
+          assignedCount: 1,
+          completedCount: 0,
+          maxAttempts: a.maxAttempts,
+          attemptsUsed: a.attemptsUsed
+        })) : [];
+      } else {
+        // For teachers/admins, fetch all exams
+        data = await api.listExams();
+      }
       setExams(Array.isArray(data) ? data : []);
     } catch (error) {
+      console.error('Error fetching exams:', error);
       setExams([]);
     }
   };
 
   const fetchModules = async () => {
     try {
-      const data = await api.listStudyModules();
+      let data;
+      if (user?.role === 'STUDENT') {
+        // For students, fetch assigned modules
+        const assignments = await api.getAssignedModules();
+        // Transform assignments to module format
+        data = Array.isArray(assignments) ? assignments.map((a: any) => ({
+          id: a.module?.id || a.id,
+          title: a.module?.title || a.title,
+          subject: a.module?.subject || a.subject,
+          description: a.module?.description || '',
+          progress: a.progress || 0,
+          lessons: a.module?.lessons || 0,
+          duration: a.module?.duration || '0h',
+          difficulty: a.module?.difficulty || 'Beginner',
+          enrolledStudents: 1
+        })) : [];
+      } else {
+        // For teachers/admins, fetch all modules
+        data = await api.listStudyModules();
+      }
       setModules(Array.isArray(data) ? data : []);
     } catch (error) {
+      console.error('Error fetching modules:', error);
       setModules([]);
     }
   };

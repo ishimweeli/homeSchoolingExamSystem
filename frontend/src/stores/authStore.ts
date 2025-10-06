@@ -35,6 +35,7 @@ interface AuthState {
   fetchProfile: () => Promise<void>;
   updateProfile: (data: { name?: string; username?: string; avatar?: string }) => Promise<void>;
   clearError: () => void;
+  clearAuth: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -103,6 +104,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearError: () => set({ error: null }),
+
+      clearAuth: () => {
+        set({ user: null, isAuthenticated: false, error: null, isLoading: false });
+      },
     }),
     {
       name: 'auth-storage',
@@ -110,3 +115,8 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+// Register callback to clear auth state when tokens expire
+api.onTokenExpired(() => {
+  useAuthStore.getState().clearAuth();
+});

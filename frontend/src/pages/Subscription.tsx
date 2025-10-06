@@ -11,6 +11,7 @@ interface Tier {
   maxExams: number;
   maxStudyModules: number;
   maxStudents: number;
+  totalAttemptsPool: number;
   price: number;
   currency: string;
   validityDays: number;
@@ -24,6 +25,7 @@ interface MyTier {
   examsCreated: number;
   studyModulesCreated: number;
   studentsCreated: number;
+  attemptsUsed: number;
   assignedAt: string;
   expiresAt?: string;
   isActive: boolean;
@@ -221,9 +223,28 @@ export default function Subscription() {
           </div>
 
           {/* Usage Stats */}
-          <div className="grid grid-cols-3 gap-4 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+            {/* Attempts Pool - HIGHLIGHTED */}
+            <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-400 rounded-xl p-4 shadow-md">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-bold text-yellow-800">🎯 Attempts Pool</span>
+                <span className="text-sm font-bold text-yellow-900">
+                  {myTier.attemptsUsed || 0} / {formatLimit(myTier.tier.totalAttemptsPool)}
+                </span>
+              </div>
+              <div className="w-full bg-yellow-200 rounded-full h-3">
+                <div
+                  className="bg-gradient-to-r from-yellow-500 to-amber-600 h-3 rounded-full transition-all"
+                  style={{ width: `${calculateUsagePercentage(myTier.attemptsUsed || 0, myTier.tier.totalAttemptsPool)}%` }}
+                />
+              </div>
+              <p className="text-xs text-yellow-700 mt-2 font-medium">
+                {myTier.tier.totalAttemptsPool - (myTier.attemptsUsed || 0)} attempts remaining
+              </p>
+            </div>
+
             {/* Exams Usage */}
-            <div className="bg-white rounded-xl p-4">
+            <div className="bg-white rounded-xl p-4 border border-gray-200">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-600">Exams Created</span>
                 <span className="text-sm font-bold text-gray-900">
@@ -239,7 +260,7 @@ export default function Subscription() {
             </div>
 
             {/* Study Modules Usage */}
-            <div className="bg-white rounded-xl p-4">
+            <div className="bg-white rounded-xl p-4 border border-gray-200">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-600">Study Modules</span>
                 <span className="text-sm font-bold text-gray-900">
@@ -255,7 +276,7 @@ export default function Subscription() {
             </div>
 
             {/* Students Usage */}
-            <div className="bg-white rounded-xl p-4">
+            <div className="bg-white rounded-xl p-4 border border-gray-200">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-600">Students</span>
                 <span className="text-sm font-bold text-gray-900">
@@ -345,6 +366,14 @@ export default function Subscription() {
 
               {/* Features */}
               <ul className="space-y-3 mb-8">
+                <li className="flex items-start gap-3">
+                  <div className="w-5 h-5 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-xs">🎯</span>
+                  </div>
+                  <span className="text-gray-700">
+                    <strong className="text-yellow-700">{formatLimit(tier.totalAttemptsPool)}</strong> <strong>Attempts Pool</strong>
+                  </span>
+                </li>
                 <li className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                   <span className="text-gray-700">

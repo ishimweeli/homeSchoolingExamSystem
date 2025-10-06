@@ -11,7 +11,8 @@ interface QuestionType {
 
 export default function ExamCreate() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -151,7 +152,7 @@ export default function ExamCreate() {
   };
 
   const publishExam = async () => {
-    setLoading(true);
+    setPublishing(true);
     setError('');
 
     try {
@@ -187,12 +188,12 @@ export default function ExamCreate() {
       const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to publish exam. Please try again.';
       setError(message);
     } finally {
-      setLoading(false);
+      setPublishing(false);
     }
   };
 
   const saveDraft = async () => {
-    setLoading(true);
+    setSavingDraft(true);
     try {
       const examData = {
         title: generatedExam.title,
@@ -224,7 +225,7 @@ export default function ExamCreate() {
       const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to save draft';
       setError(message);
     } finally {
-      setLoading(false);
+      setSavingDraft(false);
     }
   };
 
@@ -483,8 +484,32 @@ export default function ExamCreate() {
               <button onClick={() => setCurrentStep(1)} className="px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">← Back to Configuration</button>
 
               <div className="flex space-x-4">
-                <button onClick={saveDraft} disabled={loading} className="px-6 py-3 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50">Save as Draft</button>
-                <button onClick={publishExam} disabled={loading} className="px-8 py-3 rounded-lg bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold hover:shadow-lg transform hover:scale-105 transition">{loading ? 'Publishing...' : '🚀 Publish Exam'}</button>
+                <button onClick={saveDraft} disabled={savingDraft || publishing} className="px-6 py-3 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {savingDraft ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving...
+                    </span>
+                  ) : (
+                    'Save as Draft'
+                  )}
+                </button>
+                <button onClick={publishExam} disabled={savingDraft || publishing} className="px-8 py-3 rounded-lg bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold hover:shadow-lg transform hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                  {publishing ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Publishing...
+                    </span>
+                  ) : (
+                    '🚀 Publish Exam'
+                  )}
+                </button>
               </div>
             </div>
           </div>

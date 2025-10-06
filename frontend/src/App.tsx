@@ -20,8 +20,11 @@ import ExamsListSimple from './pages/ExamsListSimple'
 import Exams from './pages/Exams'
 import { ExamTaker } from './components/ExamTaker'
 import ExamResults from './pages/ExamResults'
+import ExamStudentResults from './pages/ExamStudentResults'
 import ModuleCreate from './pages/ModuleCreate'
 import ModuleView from './pages/ModuleView'
+import ModuleTaker from './pages/ModuleTaker'
+import ModuleStudentProgress from './pages/ModuleStudentProgress'
 import StudyModules from './pages/StudyModules'
 import AITools from './pages/AITools'
 import Analytics from './pages/Analytics'
@@ -54,11 +57,14 @@ function App() {
         {/* Consolidated exam creation under /exams/create */}
         <Route path="/exams/take/:id" element={<ProtectedRoute><ExamTaker /></ProtectedRoute>} />
         <Route path="/exams/results/:id" element={<ProtectedRoute><ExamResults /></ProtectedRoute>} />
+        <Route path="/exams/:examId/student-results" element={<ProtectedRoute><ExamStudentResults /></ProtectedRoute>} />
         <Route path="/exams/:id" element={<ProtectedRoute><ExamView /></ProtectedRoute>} />
         <Route path="/exams/:id/edit" element={<ProtectedRoute><ExamEdit /></ProtectedRoute>} />
         <Route path="/modules" element={<ProtectedRoute><StudyModules /></ProtectedRoute>} />
         <Route path="/modules/create" element={<ProtectedRoute><ModuleCreate /></ProtectedRoute>} />
         <Route path="/modules/:id" element={<ProtectedRoute><ModuleView /></ProtectedRoute>} />
+        <Route path="/modules/:id/take" element={<ProtectedRoute><ModuleTaker /></ProtectedRoute>} />
+        <Route path="/modules/:id/student-progress" element={<ProtectedRoute><ModuleStudentProgress /></ProtectedRoute>} />
         <Route path="/ai-tools" element={<ProtectedRoute><AITools /></ProtectedRoute>} />
         <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

@@ -16,9 +16,11 @@ export const getResults = async (req: Request, res: Response) => {
     let results: any[] = [];
 
     if (userRole === 'STUDENT') {
-      // Get student's own exam results
+      // Get student's own exam results (both completed and in-progress)
       results = await prisma.examAttempt.findMany({
-        where: { studentId: userId },
+        where: { 
+          studentId: userId
+        },
         include: {
           exam: {
             select: {
