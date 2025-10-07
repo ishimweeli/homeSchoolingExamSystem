@@ -363,6 +363,7 @@ class ApiService {
     difficulty?: 'easy' | 'medium' | 'hard';
     lessonCount?: number;
     includeGamification?: boolean;
+    country?: 'USA' | 'UK' | 'AUSTRALIA' | 'NEW_ZEALAND' | 'RWANDA' | 'GENERAL';
   }) {
     const res = await this.instance.post('/study-modules/generate', payload);
     return res.data.data;

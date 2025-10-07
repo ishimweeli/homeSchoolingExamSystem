@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { toast } from 'sonner';
-import { useAuthStore } from '../stores/authStore';
 
 interface Step {
   type: string;
@@ -29,6 +28,7 @@ interface Module {
   xpReward: number;
   lives: number;
   maxLives: number;
+  livesEnabled?: boolean;
 }
 
 interface Assignment {
@@ -44,7 +44,6 @@ interface Assignment {
 export default function ModuleTaker() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
   
   const [module, setModule] = useState<Module | null>(null);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
@@ -55,7 +54,6 @@ export default function ModuleTaker() {
   const [userAnswer, setUserAnswer] = useState<any>('');
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
-  const [canProceed, setCanProceed] = useState(false);
 
   useEffect(() => {
     startModule();
@@ -63,8 +61,8 @@ export default function ModuleTaker() {
 
   const startModule = async () => {
     try {
-      const response = await api.post(`/study-modules/${id}/start`);
-      const data = response.data?.data || response.data;
+      const response: any = await api.post(`/study-modules/${id}/start`);
+      const data: any = response.data?.data || response.data;
       
       // Module is inside assignment object
       const moduleData = data.assignment?.module || data.module;
@@ -98,6 +96,15 @@ export default function ModuleTaker() {
     const content = currentStep.content;
     let correct = false;
 
+    // Helper function to normalize text for comparison
+    const normalizeText = (text: string): string => {
+      return text
+        .trim()
+        .toLowerCase()
+        .replace(/[.,!?;:'"]/g, '') // Remove punctuation
+        .replace(/\s+/g, ' '); // Normalize spaces
+    };
+
     // Check based on question type
     switch (content.type) {
       case 'multiple_choice':
@@ -112,12 +119,32 @@ export default function ModuleTaker() {
       case 'fill-in-the-blank':
       case 'fill_in_blank':
       case 'text_entry':
-        const userLower = userAnswer.trim().toLowerCase();
-        const correctLower = content.correctAnswer.trim().toLowerCase();
-        correct = userLower === correctLower || userAnswer.trim() === content.correctAnswer.trim();
+        // More flexible checking for text answers
+        const userNormalized = normalizeText(userAnswer);
+        const correctNormalized = normalizeText(content.correctAnswer);
+        
+        // Check for exact match after normalization
+        correct = userNormalized === correctNormalized;
+        
+        // If not exact match, check if user answer contains the key words
+        if (!correct && content.correctAnswer) {
+          const correctWords = correctNormalized.split(' ').filter(w => w.length > 2);
+          const userWords = userNormalized.split(' ').filter(w => w.length > 2);
+          
+          // If user answer contains most of the key words from correct answer, accept it
+          const matchingWords = correctWords.filter(word => userWords.includes(word));
+          const matchPercentage = matchingWords.length / correctWords.length;
+          
+          // Accept if 70% or more of key words match
+          correct = matchPercentage >= 0.7;
+        }
         break;
       case 'true_false':
-        correct = userAnswer === content.correctAnswer || userAnswer.toString() === content.correctAnswer.toString();
+        const userTF = normalizeText(userAnswer.toString());
+        const correctTF = normalizeText(content.correctAnswer.toString());
+        correct = userTF === correctTF || 
+                  (userTF === 't' && correctTF === 'true') ||
+                  (userTF === 'f' && correctTF === 'false');
         break;
       default:
         correct = true; // Theory steps auto-pass
@@ -145,8 +172,6 @@ export default function ModuleTaker() {
         return;
       }
     }
-
-    setCanProceed(correct); // Only allow proceed if correct
   };
 
   const nextStep = async () => {
@@ -155,7 +180,6 @@ export default function ModuleTaker() {
     // Clear all state before moving to next step
     setShowFeedback(false);
     setUserAnswer('');
-    setCanProceed(false);
     setIsCorrect(false);
 
     const currentLesson = module.lessons[currentLessonIndex];
@@ -198,7 +222,7 @@ export default function ModuleTaker() {
     // Save progress to backend
     try {
       console.log(`💾 Saving: Lesson ${newLessonIndex + 1}, Step ${newStepIndex + 1}`);
-      const response = await api.post(`/study-modules/${id}/progress`, {
+      const response: any = await api.post(`/study-modules/${id}/progress`, {
         currentLesson: newLessonIndex + 1, // Backend uses 1-based indexing
         currentStep: newStepIndex + 1,
         xpEarned,
@@ -275,7 +299,7 @@ export default function ModuleTaker() {
           )}
 
           <button
-            onClick={() => { setCanProceed(true); nextStep(); }}
+            onClick={nextStep}
             className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold text-lg hover:shadow-lg transition"
           >
             Continue →
@@ -375,7 +399,6 @@ export default function ModuleTaker() {
                     setUserAnswer('understood');
                     setIsCorrect(true);
                     setShowFeedback(true);
-                    setCanProceed(true);
                   }}
                   disabled={showFeedback}
                   className="w-full py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition disabled:opacity-50"
@@ -435,7 +458,6 @@ export default function ModuleTaker() {
                 setCurrentStepIndex(0);
                 setShowFeedback(false);
                 setUserAnswer('');
-                setCanProceed(false);
                 setIsCorrect(false); // Clear the wrong answer state
               }}
               className="w-full py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg font-semibold text-lg hover:shadow-lg transition"
@@ -454,7 +476,7 @@ export default function ModuleTaker() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50">
       {/* HEADER */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-5xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-3">
             <button onClick={() => navigate('/modules')} className="text-purple-600 hover:text-purple-700 flex items-center">
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -489,29 +511,96 @@ export default function ModuleTaker() {
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
-          {/* LESSON INFO */}
-          <div className="mb-6 pb-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-purple-600 font-semibold mb-1">
-                  Lesson {currentLessonIndex + 1} of {module.lessons.length}
-                </p>
-                <h2 className="text-2xl font-bold text-gray-900">{currentLesson.title}</h2>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">Step</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {currentStepIndex + 1} / {currentLesson.steps.length}
-                </p>
+      {/* MAIN CONTENT WITH SIDEBAR */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* LESSON SIDEBAR */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-200 sticky top-4">
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 px-2">Lessons</h3>
+              <div className="space-y-2">
+                {module.lessons.map((lesson, idx) => {
+                  const isCompleted = idx < currentLessonIndex;
+                  const isCurrent = idx === currentLessonIndex;
+                  
+                  return (
+                    <div
+                      key={lesson.lessonNumber}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        isCurrent
+                          ? 'border-purple-500 bg-purple-50'
+                          : isCompleted
+                          ? 'border-green-500 bg-green-50'
+                          : 'border-gray-200 bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                          isCompleted
+                            ? 'bg-green-500 text-white'
+                            : isCurrent
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-gray-300 text-gray-600'
+                        }`}>
+                          {isCompleted ? '✓' : idx + 1}
+                        </div>
+                        <div className="ml-3 flex-1 min-w-0">
+                          <p className={`text-xs font-semibold truncate ${
+                            isCurrent ? 'text-purple-900' : isCompleted ? 'text-green-900' : 'text-gray-600'
+                          }`}>
+                            {lesson.title}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {isCompleted ? 'Completed' : isCurrent ? 'In Progress' : 'Locked'}
+                          </p>
+                        </div>
+                      </div>
+                      {isCurrent && (
+                        <div className="mt-2 pt-2 border-t border-purple-200">
+                          <div className="flex items-center justify-between text-xs text-purple-700">
+                            <span>Step {currentStepIndex + 1}/{lesson.steps.length}</span>
+                            <span>{Math.round((currentStepIndex / lesson.steps.length) * 100)}%</span>
+                          </div>
+                          <div className="mt-1 bg-purple-200 rounded-full h-1.5">
+                            <div
+                              className="bg-purple-600 h-1.5 rounded-full transition-all"
+                              style={{ width: `${(currentStepIndex / lesson.steps.length) * 100}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          {/* STEP CONTENT */}
-          {renderStepContent()}
+          {/* MAIN CONTENT */}
+          <div className="lg:col-span-3">
+            <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+              {/* LESSON INFO */}
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-purple-600 font-semibold mb-1">
+                      Lesson {currentLessonIndex + 1} of {module.lessons.length}
+                    </p>
+                    <h2 className="text-2xl font-bold text-gray-900">{currentLesson.title}</h2>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">Step</p>
+                    <p className="text-xl font-bold text-gray-900">
+                      {currentStepIndex + 1} / {currentLesson.steps.length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* STEP CONTENT */}
+              {renderStepContent()}
+            </div>
+          </div>
         </div>
       </div>
     </div>

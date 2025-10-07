@@ -3,14 +3,17 @@ import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+type CountryCode = 'USA' | 'UK' | 'AUSTRALIA' | 'NEW_ZEALAND' | 'RWANDA' | 'GENERAL';
+
 export default function ModuleCreate() {
   const navigate = useNavigate();
   const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
-  const [gradeLevel, setGradeLevel] = useState(5);
+  const [gradeLevel, setGradeLevel] = useState(0); // 0 = All levels
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [lessonCount, setLessonCount] = useState(10);
   const [includeGamification, setIncludeGamification] = useState(true);
+  const [country, setCountry] = useState<CountryCode>('GENERAL');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +32,7 @@ export default function ModuleCreate() {
         difficulty,
         lessonCount,
         includeGamification,
+        country,
       });
       
       toast.success(`✨ Study module "${module.title}" created successfully with ${lessonCount} lessons!`);
@@ -121,6 +125,24 @@ export default function ModuleCreate() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Country/Curriculum *
+                  </label>
+                  <select
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value as CountryCode)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="GENERAL">🌍 General (International) - Default</option>
+                    <option value="USA">🇺🇸 USA (Common Core)</option>
+                    <option value="UK">🇬🇧 UK (National Curriculum)</option>
+                    <option value="AUSTRALIA">🇦🇺 Australia (ACARA)</option>
+                    <option value="NEW_ZEALAND">🇳🇿 New Zealand (NZC)</option>
+                    <option value="RWANDA">🇷🇼 Rwanda (CBC)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Grade Level *
                   </label>
                   <select
@@ -128,11 +150,30 @@ export default function ModuleCreate() {
                     onChange={(e) => setGradeLevel(Number(e.target.value))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((grade) => (
-                      <option key={grade} value={grade}>
-                        Grade {grade}
-                      </option>
-                    ))}
+                    {/* All Levels - Default */}
+                    <option value="0">All (Complete Course)</option>
+                    <option disabled>──────────</option>
+                    
+                    {/* K-12 Levels */}
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((grade) => {
+                      let label = '';
+                      if (country === 'RWANDA') {
+                        label = grade <= 6 ? `P${grade} (Primary ${grade})` : `S${grade - 6} (Secondary ${grade - 6})`;
+                      } else if (country === 'UK' || country === 'AUSTRALIA' || country === 'NEW_ZEALAND') {
+                        label = `Year ${grade}`;
+                      } else {
+                        label = `Grade ${grade}`;
+                      }
+                      return (
+                        <option key={grade} value={grade}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                    
+                    {/* University Level (same for all countries) */}
+                    <option disabled>──────────</option>
+                    <option value="13">University</option>
                   </select>
                 </div>
 
@@ -158,12 +199,12 @@ export default function ModuleCreate() {
                   <input
                     type="number"
                     min={3}
-                    max={20}
+                    max={10}
                     value={lessonCount}
                     onChange={(e) => setLessonCount(Number(e.target.value))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Recommended: 5-15 lessons</p>
+                  <p className="text-xs text-gray-500 mt-1">Maximum: 10 lessons (optimized for quality)</p>
                 </div>
               </div>
             </div>
