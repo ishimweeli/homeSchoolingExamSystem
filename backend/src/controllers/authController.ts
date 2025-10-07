@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prisma } from '../utils/db';
 import crypto from 'crypto';
+import mailer from '../config/mailerConfig';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -84,6 +85,8 @@ export const register = async (req: Request, res: Response) => {
       { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' } as any
     );
 
+    await sendVerificationEmail(user.email!);
+
     res.status(200).json({
       success: true,
       message: 'Registration successful',
@@ -103,12 +106,40 @@ export const register = async (req: Request, res: Response) => {
     }
 
     console.error('Registration error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Registration failed'
     });
   }
 };
+
+export const sendVerificationEmail = async (email: string) => {
+  try {
+    const verificationEmail = await prisma.verificationToken.create({
+      data: {
+        identifier: email!,
+        token: crypto.randomBytes(32).toString('hex'),
+        expires: new Date(Date.now() + 1000 * 60 * 60 * 24)
+      }
+    });
+
+    await mailer.sendMail({
+      from: process.env.SMTP_USER,
+      to: email!,
+      subject: "Account Verification Email",
+      html: `
+        <h1>Email Verification</h1>
+        <p>Please verify your email by clicking the link below:</p>
+        <a href='${process.env.FRONTEND_URL}/verify-email?token=${verificationEmail.token}'>Verify Email</a>
+        <p>This link will expire in 24 hours.</p>
+      `
+    })
+  } catch (error) {
+    console.error("Error sending verification email: ", error);
+    throw new Error('Could not send verification email');
+  }
+}
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -142,6 +173,7 @@ export const login = async (req: Request, res: Response) => {
         message: 'Please use OAuth login for this account'
       });
     }
+
 
     const isPasswordValid = await bcrypt.compare(validatedData.password, user.password);
 
@@ -422,6 +454,18 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
     // TODO: email sending integration. For now, log for dev
     // console.log('Password reset link:', `${process.env.FRONTEND_URL}/reset-password?token=${token}`);
 
+    await mailer.sendMail({
+      from: process.env.SMTP_USER,
+      to: email!,
+      subject: "Password Reset Email",
+      html: `
+        <h1>Password Reset</h1>
+        <p>Please reset your password by clicking the link below:</p>
+        <a href='${process.env.FRONTEND_URL}/reset-password?token=${token}'>Password reset link</a>
+        <p>This link will expire in 24 hours.</p>
+      `
+    })
+
     res.status(200).json({ success: true, message: 'If an account exists, a reset link was sent' });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -471,7 +515,7 @@ export const resendVerification = async (req: Request, res: Response) => {
     const expires = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 hours
     await prisma.verificationToken.create({ data: { identifier: email, token, expires } });
 
-    // console.log('Verify email link:', `${process.env.FRONTEND_URL}/verify-email?token=${token}`);
+    await sendVerificationEmail(email);
 
     res.json({ success: true, message: 'Verification link sent if email exists' });
   } catch (error) {
@@ -482,7 +526,7 @@ export const resendVerification = async (req: Request, res: Response) => {
 export const verifyEmail = async (req: Request, res: Response) => {
   try {
     const { token } = verifySchema.parse(req.query);
-    const vt = await prisma.verificationToken.findUnique({ where: { token: String(token) } });
+    const vt = await prisma.verificationToken.findUnique({ where: { token: token } });
     if (!vt || vt.expires < new Date()) {
       return res.status(400).json({ success: false, message: 'Invalid or expired token' });
     }
@@ -494,6 +538,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
     await prisma.verificationToken.delete({ where: { token: vt.token } });
     res.json({ success: true, message: 'Email verified successfully' });
   } catch (error) {
+    console.log("Error verifying email: ", error)
     res.status(400).json({ success: false, message: 'Verification failed' });
   }
 };
@@ -561,7 +606,14 @@ export const logout = async (req: Request, res: Response) => {
     if (userId) {
       // Optionally track logout time using lastLogin field
       // Note: We could use lastLogin to track last activity
-      // For now, just acknowledge the logout
+      await prisma.user
+        .update({
+          where: { id: userId },
+          data: { lastLogin: new Date() }
+        })
+        .catch(err => {
+          console.error('Error updating lastLogin on logout:', err);
+        });
     }
 
     res.json({

@@ -49,6 +49,7 @@ CREATE TABLE "users" (
     "role" "Role" NOT NULL DEFAULT 'STUDENT',
     "emailVerified" TIMESTAMP(3),
     "image" TEXT,
+    "onboarded" BOOLEAN NOT NULL DEFAULT false,
     "parentId" TEXT,
     "createdById" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,

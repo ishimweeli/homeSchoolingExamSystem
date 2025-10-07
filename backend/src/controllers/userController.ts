@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../utils/db';
 import bcrypt from 'bcryptjs';
-import { incrementTierUsage } from '../middleware/tierLimits';
 
 const createStudentSchema = z.object({
   name: z.string().min(2),
