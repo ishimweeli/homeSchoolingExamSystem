@@ -16,7 +16,7 @@ export default function Login() {
     try {
       await login(emailOrUsername, password)
       navigate('/dashboard')
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return (

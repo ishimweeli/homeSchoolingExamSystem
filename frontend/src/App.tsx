@@ -27,6 +27,8 @@ import Settings from './pages/Settings'
 import Subscription from './pages/Subscription'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminTiers from './pages/AdminTiers'
+import RequireRole from './components/RequireRole'
+import Forbidden from './pages/Forbidden'
 
 function App() {
   return (
@@ -42,7 +44,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/resend-verification" element={<ResendVerification />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
-        
+
         {/* Protected routes with shared layout */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
@@ -58,7 +60,12 @@ function App() {
         <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
-        <Route path="/admin/tiers" element={<ProtectedRoute><AdminTiers /></ProtectedRoute>} />
+        <Route path="/admin/tiers" element={<ProtectedRoute>
+          <RequireRole allowedRoles={['ADMIN']}>
+            <AdminTiers />
+          </RequireRole>
+        </ProtectedRoute>} />
+        <Route path="/forbidden" element={<Forbidden />} />
       </Routes>
     </Router>
   )

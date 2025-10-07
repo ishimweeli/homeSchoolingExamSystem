@@ -1,21 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import api from '../services/api'
 
 export default function VerifyEmail() {
   const [params] = useSearchParams()
   const token = params.get('token') || ''
-  const [status, setStatus] = useState<'idle'|'success'|'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const hasRun = useRef(false)
 
   useEffect(() => {
-    if (!token) {
-      setStatus('error')
-      return
-    }
+    if (hasRun.current || !token) return
+    hasRun.current = true
+
     api.verifyEmail(token)
       .then(() => setStatus('success'))
       .catch(() => setStatus('error'))
   }, [token])
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
