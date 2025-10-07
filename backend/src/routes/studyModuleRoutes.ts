@@ -3,6 +3,9 @@ import { verifyToken, requireRole } from '../middleware/auth';
 import {
   createStudyModule,
   generateStudyModuleWithAI,
+  generateCourseOutline,
+  generateSingleLesson,
+  generateAllLessons,
   getStudyModules,
   getStudyModule,
   assignStudyModule,
@@ -20,7 +23,12 @@ router.post('/', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), createS
 router.get('/:id', verifyToken, getStudyModule);
 router.post('/:id/assign', verifyToken, requireRole('PARENT', 'TEACHER'), assignStudyModule);
 
-// AI generation
+// AI generation (2-step approach)
+router.post('/generate-outline', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), generateCourseOutline);
+router.post('/:moduleId/generate-lesson/:lessonNumber', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), generateSingleLesson);
+router.post('/:moduleId/generate-all-lessons', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), generateAllLessons);
+
+// AI generation (legacy - full course at once)
 router.post('/generate', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), generateStudyModuleWithAI);
 
 // Interactive learning routes
