@@ -14,6 +14,7 @@ import {
   getStudentProgress,
   getModuleLeaderboard
 } from '../controllers/studyModuleController';
+import { checkTierLimit } from '../middleware/tierLimits';
 
 const router = Router();
 
@@ -24,12 +25,12 @@ router.get('/:id', verifyToken, getStudyModule);
 router.post('/:id/assign', verifyToken, requireRole('PARENT', 'TEACHER'), assignStudyModule);
 
 // AI generation (2-step approach)
-router.post('/generate-outline', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), generateCourseOutline);
-router.post('/:moduleId/generate-lesson/:lessonNumber', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), generateSingleLesson);
-router.post('/:moduleId/generate-all-lessons', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), generateAllLessons);
+router.post('/generate-outline', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), checkTierLimit('CREATE_STUDY_MODULE'), generateCourseOutline);
+router.post('/:moduleId/generate-lesson/:lessonNumber', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), checkTierLimit('CREATE_STUDY_MODULE'), generateSingleLesson);
+router.post('/:moduleId/generate-all-lessons', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), checkTierLimit('CREATE_STUDY_MODULE'), generateAllLessons);
 
 // AI generation (legacy - full course at once)
-router.post('/generate', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), generateStudyModuleWithAI);
+router.post('/generate', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), checkTierLimit('CREATE_STUDY_MODULE'), generateStudyModuleWithAI);
 
 // Interactive learning routes
 router.post('/:id/start', verifyToken, startStudyModule);

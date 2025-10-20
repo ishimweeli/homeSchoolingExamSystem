@@ -75,7 +75,7 @@ export default function ModuleCreate() {
         )}
 
         {/* Form Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-purple-100">
+        <div className="bg-white rounded-2xl  p-8">
           <form onSubmit={onSubmit} className="space-y-6">
             {/* Basic Info Section */}
             <div className="space-y-4">

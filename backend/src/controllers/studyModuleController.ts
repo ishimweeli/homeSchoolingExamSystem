@@ -31,6 +31,75 @@ const generateStudyModuleSchema = z.object({
   country: z.enum(['USA', 'UK', 'AUSTRALIA', 'NEW_ZEALAND', 'RWANDA', 'GENERAL']).default('GENERAL'),
 });
 
+// 🧩 Step content schema
+const stepContentSchema = z.object({
+  type: z.string().optional(),
+  question: z.string().optional(),
+  explanation: z.string().optional(),
+  learningText: z.string().optional(),
+  correctAnswer: z.union([
+    z.string(),
+    z.boolean(),
+    z.record(z.string(), z.string())
+  ]).optional(),
+  options: z.array(z.string()).optional(),
+  pairs: z.record(z.string(), z.string()).optional(),
+  text: z.string().optional(),
+  examples: z.array(z.string()).optional(),
+});
+
+// 🧩 Step schema
+const stepSchema = z.object({
+  id: z.string().optional(),
+  lessonId: z.string().optional(),
+  stepNumber: z.number().optional(),
+  type: z.string().optional(),
+  title: z.string().optional(),
+  content: stepContentSchema.optional(),
+  passingScore: z.number().optional(),
+  timeLimit: z.number().nullable().optional(),
+  order: z.number().optional(),
+});
+
+// 🧩 Lesson schema
+const lessonSchema = z.object({
+  id: z.string().optional(),
+  moduleId: z.string().optional(),
+  lessonNumber: z.number().optional(),
+  title: z.string().optional(),
+  content: z.string().optional(), // stored as JSON string
+  minScore: z.number().optional(),
+  maxAttempts: z.number().optional(),
+  xpReward: z.number().optional(),
+  order: z.number().optional(),
+  steps: z.array(stepSchema).optional(),
+});
+
+// 🧩 Main Update Study Module Schema
+export const updateStudyModuleSchema = z.object({
+  id: z.string(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  topic: z.string().optional(),
+  subject: z.string().optional(),
+  gradeLevel: z.number().min(0).max(13).optional(),
+  aiGenerated: z.boolean().optional(),
+  difficulty: z.enum(["easy", "medium", "hard"]).optional(),
+  totalLessons: z.number().min(1).max(10).optional(),
+  passingScore: z.number().min(0).max(100).optional(),
+  livesEnabled: z.boolean().optional(),
+  maxLives: z.number().min(0).max(10).optional(),
+  xpReward: z.number().min(0).optional(),
+  badgeType: z.string().optional(),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+  includeGamification: z.boolean().optional(),
+  country: z.enum(["USA", "UK", "AUSTRALIA", "NEW_ZEALAND", "RWANDA", "GENERAL"]).optional(),
+  lessons: z.array(lessonSchema).optional(),
+  topics: z.array(z.string()).optional(),
+  updatedAt: z.string().datetime().optional(),
+});
+
+
 const submitStepAnswerSchema = z.object({
   stepId: z.string(),
   answer: z.any(),
@@ -91,35 +160,35 @@ export const createStudyModule = async (req: Request, res: Response) => {
 function fixMalformedJSON(jsonString: string): string {
   // Remove completely invalid control characters
   let fixed = jsonString.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F]/g, '');
-  
+
   // Try to intelligently fix newlines and tabs inside string values
   // This is a heuristic approach - replace literal newlines that appear between quotes
   let result = '';
   let inString = false;
   let escapeNext = false;
-  
+
   for (let i = 0; i < fixed.length; i++) {
     const char = fixed[i];
     const prevChar = i > 0 ? fixed[i - 1] : '';
-    
+
     if (escapeNext) {
       result += char;
       escapeNext = false;
       continue;
     }
-    
+
     if (char === '\\') {
       result += char;
       escapeNext = true;
       continue;
     }
-    
+
     if (char === '"' && prevChar !== '\\') {
       inString = !inString;
       result += char;
       continue;
     }
-    
+
     // If we're inside a string, escape literal newlines and tabs
     if (inString) {
       if (char === '\n') {
@@ -135,7 +204,7 @@ function fixMalformedJSON(jsonString: string): string {
       result += char;
     }
   }
-  
+
   return result;
 }
 
@@ -293,13 +362,13 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
     // Max 10 lessons ensures consistent quality, no duplication, perfect progression
     // Split-merge disabled for 100% reliability
     const shouldSplit = false; // Always use single request for best quality
-    
+
     let moduleData: any;
 
     if (shouldSplit) {
       // Split into two parts for 100% reliability
       const halfLessons = Math.ceil(validatedData.lessonCount / 2);
-      
+
       console.log('📦 SPLITTING Complete Course into TWO parts for 100% reliability:');
       console.log('  - Part 1: Lessons 1-' + halfLessons);
       console.log('  - Part 2: Lessons ' + (halfLessons + 1) + '-' + validatedData.lessonCount);
@@ -346,11 +415,11 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
       if (cleaned1.startsWith('```')) {
         cleaned1 = cleaned1.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
       }
-      
+
       // Fix malformed JSON using helper function
       console.log('🧹 [PART 1] Fixing malformed JSON...');
       cleaned1 = fixMalformedJSON(cleaned1);
-      
+
       let part1Data;
       try {
         part1Data = JSON.parse(cleaned1);
@@ -361,17 +430,17 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
         console.error('Last 500 chars:', cleaned1.substring(cleaned1.length - 500));
         throw new Error('Part 1: AI response is not valid JSON. Please try again.');
       }
-      
+
       console.log('✅ [PART 1] JSON parsed successfully, lessons:', part1Data.lessons?.length);
 
       // ========== PART 2: Generate second half (CONTINUATION) ==========
       const remainingLessons = validatedData.lessonCount - halfLessons;
-      
+
       // Extract lesson titles from Part 1 to avoid duplication
       const part1Topics = part1Data.lessons.map((l: any) => l.title).join(', ');
-      
+
       console.log('📋 Part 1 covered topics:', part1Topics);
-      
+
       const promptConfig2 = generateStudyModulePrompt({
         subject: validatedData.subject,
         gradeLevel: validatedData.gradeLevel,
@@ -415,11 +484,11 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
       if (cleaned2.startsWith('```')) {
         cleaned2 = cleaned2.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
       }
-      
+
       // Fix malformed JSON using helper function
       console.log('🧹 [PART 2] Fixing malformed JSON...');
       cleaned2 = fixMalformedJSON(cleaned2);
-      
+
       let part2Data;
       try {
         part2Data = JSON.parse(cleaned2);
@@ -430,7 +499,7 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
         console.error('Last 500 chars:', cleaned2.substring(cleaned2.length - 500));
         throw new Error('Part 2: AI response is not valid JSON. Please try again.');
       }
-      
+
       console.log('✅ [PART 2] JSON parsed successfully, lessons:', part2Data.lessons?.length);
 
       // ========== MERGE: Combine both parts ==========
@@ -549,7 +618,7 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
       console.log('  - Usage:', completion.usage);
 
       const aiResponse = completion.choices[0].message.content;
-      
+
       if (!aiResponse) {
         throw new Error('AI did not return any content');
       }
@@ -575,7 +644,7 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
       const closeBraces = (cleanedResponse.match(/\}/g) || []).length;
       const openBrackets = (cleanedResponse.match(/\[/g) || []).length;
       const closeBrackets = (cleanedResponse.match(/\]/g) || []).length;
-      
+
       if (openBraces !== closeBraces || openBrackets !== closeBrackets) {
         console.error('⚠️ JSON appears incomplete!');
         console.error(`  - Open braces: ${openBraces}, Close braces: ${closeBraces}`);
@@ -626,11 +695,41 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
         // Ensure steps array exists
         const originalSteps = Array.isArray(safeLesson.steps) ? safeLesson.steps : [];
 
-        // Helper creators for default steps
-        const makeMC = (q: string, options: string[], correctLetter: 'A'|'B'|'C'|'D', explanation: string) => ({
+        // Helper function to ensure learningText exists for practice steps
+        const ensureLearningText = (step: any): any => {
+          // THEORY steps don't need learningText
+          if (step.type === 'THEORY') {
+            return step;
+          }
+
+          // For practice steps, ensure learningText exists
+          if (!step.content) {
+            step.content = {};
+          }
+
+          if (!step.content.learningText || step.content.learningText.trim().length === 0) {
+            // Generate default learningText based on the question type and topic
+            const defaultLearningTexts: Record<string, string> = {
+              multiple_choice: `Let's review the key concept: ${validatedData.topic} involves understanding specific patterns and rules. Pay attention to the options and identify which one correctly applies what you've learned. Look for clues in the question that point to the right answer.`,
+              'fill-in-the-blank': `Before filling in the blank, remember the rule: ${validatedData.topic} requires careful attention to form and context. Read the sentence carefully and use the hint in parentheses to determine the exact word needed. There's only one correct form that fits.`,
+              true_false: `Quick reminder: ${validatedData.topic} follows specific rules and patterns. Read the statement carefully and check if it follows these rules correctly. Think about what you've learned so far - does this statement match those principles?`,
+              matching: `Here's what you need to know: ${validatedData.topic} involves recognizing relationships and patterns. For this matching exercise, look for logical connections between items. Use what you've learned to pair each item correctly.`,
+              ordering: `Important principle: ${validatedData.topic} has a specific structure and word order. When arranging items, think about the correct sequence based on the rules you've learned. The order matters - arrange them to form the proper structure.`,
+            };
+
+            step.content.learningText = defaultLearningTexts[step.content.type] ||
+              `Before attempting this question, remember that ${validatedData.topic} requires understanding key concepts and applying them correctly. Take your time and think about what you've learned in this lesson.`;
+          }
+
+          return step;
+        };
+
+        // Helper creators for default steps with learningText
+        const makeMC = (q: string, options: string[], correctLetter: 'A' | 'B' | 'C' | 'D', explanation: string, learningText?: string) => ({
           type: 'PRACTICE_EASY',
           title: 'Multiple Choice',
           content: {
+            learningText: learningText || `Understanding ${validatedData.topic} means recognizing correct patterns. Look at each option carefully and identify which one demonstrates the concept properly. The correct answer will follow the rules you've learned.`,
             type: 'multiple_choice',
             question: q,
             options: options.map((opt, i) => `${String.fromCharCode(65 + i)}) ${opt}`),
@@ -639,10 +738,11 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
           },
         });
 
-        const makeFillBlank = (q: string, answer: string, explanation: string) => ({
+        const makeFillBlank = (q: string, answer: string, explanation: string, learningText?: string) => ({
           type: 'PRACTICE_EASY',
           title: 'Fill in the Blank',
           content: {
+            learningText: learningText || `For ${validatedData.topic}, pay attention to the context clues in the sentence. The hint in parentheses guides you to the exact form needed. Remember: there's only one correct answer that fits both the meaning and the grammar.`,
             type: 'fill-in-the-blank',
             question: q,
             correctAnswer: answer,
@@ -650,10 +750,11 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
           },
         });
 
-        const makeTrueFalse = (q: string, answer: 'True'|'False', explanation: string) => ({
+        const makeTrueFalse = (q: string, answer: 'True' | 'False', explanation: string, learningText?: string) => ({
           type: 'PRACTICE_EASY',
           title: 'True or False',
           content: {
+            learningText: learningText || `Let's check your understanding of ${validatedData.topic}. Read the statement carefully and decide if it follows the rules correctly. Think about the patterns you've learned - does this example match them?`,
             type: 'true_false',
             question: q,
             correctAnswer: answer,
@@ -661,38 +762,40 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
           },
         });
 
-        const makeMatching = (pairs: {active: string; passive: string;}[], explanation: string) => ({
+        const makeMatching = (pairs: { left: string; right: string; }[], explanation: string, learningText?: string) => ({
           type: 'PRACTICE_MEDIUM',
-          title: 'Match Active to Passive',
+          title: 'Match the Pairs',
           content: {
+            learningText: learningText || `For this matching exercise on ${validatedData.topic}, look for logical relationships between the items. Each left item has exactly one correct match on the right. Use your understanding of the concept to connect them properly.`,
             type: 'matching',
-            question: 'Match each active sentence to its passive form',
+            question: `Match each item correctly based on ${validatedData.topic}`,
             pairs,
             explanation,
           },
         });
 
-        const steps: any[] = [...originalSteps];
+        // Process all steps to ensure learningText exists
+        const steps: any[] = originalSteps.map(ensureLearningText);
 
         // Determine present exercise types
         const hasMC = steps.some(s => (s?.content?.type || '').includes('multiple_choice'));
-        const hasFill = steps.some(s => ['fill-in-the-blank','fill_in_blank','text_entry'].includes(String(s?.content?.type)));
+        const hasFill = steps.some(s => ['fill-in-the-blank', 'fill_in_blank', 'text_entry'].includes(String(s?.content?.type)));
         const hasTF = steps.some(s => String(s?.content?.type) === 'true_false');
         const hasMatching = steps.some(s => String(s?.content?.type) === 'matching');
 
-        // Add missing core exercise types
+        // Add missing core exercise types with learningText
         if (!hasMC) {
           steps.push(
             makeMC(
-              `Which sentence best demonstrates the concept in this lesson about ${validatedData.topic}?`,
+              `Which example best demonstrates ${validatedData.topic}?`,
               [
-                `A common statement unrelated to ${validatedData.topic}`,
-                `A statement demonstrating ${validatedData.topic}`,
-                `An off-topic sentence`,
+                `An incorrect application`,
+                `A correct demonstration of ${validatedData.topic}`,
+                `An unrelated example`,
                 `A vague statement`,
               ],
               'B',
-              `Option B directly applies ${validatedData.topic}.`
+              `Option B correctly applies the principles of ${validatedData.topic}.`
             )
           );
         }
@@ -700,9 +803,9 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
         if (!hasFill) {
           steps.push(
             makeFillBlank(
-              `Complete correctly related to ${validatedData.topic}: "The report ___ (complete) yesterday."`,
+              `Complete this sentence using ${validatedData.topic}: "The report ___ (complete) yesterday."`,
               'was completed',
-              'Use appropriate tense and structure.'
+              'Use the appropriate form based on the context and rules.'
             )
           );
         }
@@ -712,7 +815,7 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
             makeTrueFalse(
               `This sentence correctly applies ${validatedData.topic}: "The project was finished on time."`,
               'True',
-              'It emphasizes the result rather than the doer.'
+              'This statement follows the rules and patterns correctly.'
             )
           );
         }
@@ -721,20 +824,20 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
           steps.push(
             makeMatching(
               [
-                { active: 'The team won the match.', passive: 'The match was won by the team.' },
-                { active: 'They will announce the winner.', passive: 'The winner will be announced.' },
+                { left: 'Example A', right: 'Match A' },
+                { left: 'Example B', right: 'Match B' },
               ],
-              'Match each active sentence with its passive transformation.'
+              'Each item pairs logically based on the concept.'
             )
           );
         }
 
-        // Ensure at least 5 steps total (pad with a short review if needed)
+        // Ensure at least 5 steps total
         while (steps.length < 5) {
           steps.push(
             makeFillBlank(
-              `Write one short sentence applying ${validatedData.topic}.`,
-              `${validatedData.topic} applied`,
+              `Apply ${validatedData.topic} in this context: The answer ___ (be) correct.`,
+              'is',
               'Any correct application demonstrating understanding is acceptable.'
             )
           );
@@ -817,7 +920,7 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
     });
   } catch (error) {
     console.error('❌ Generate study module error:', error);
-    
+
     // More detailed error logging
     if (error instanceof Error) {
       console.error('  - Error message:', error.message);
@@ -825,10 +928,10 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
       console.error('  - Error name:', error.name);
       console.error('  - Error stack:', error.stack);
     }
-    
+
     // Check if it's a timeout or token limit issue
     const errorMessage = error instanceof Error ? error.message : '';
-    
+
     if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
       return res.status(500).json({
         success: false,
@@ -836,7 +939,7 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
         error: 'REQUEST_TIMEOUT'
       });
     }
-    
+
     if (errorMessage.includes('max_tokens') || errorMessage.includes('token limit')) {
       return res.status(500).json({
         success: false,
@@ -852,7 +955,7 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
         error: 'INCOMPLETE_AI_RESPONSE'
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : 'Failed to generate study module',
@@ -860,6 +963,154 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
     });
   }
 };
+
+export const updateStudyModule = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // ✅ Validate input (ensure `id` exists)
+    const validatedData = updateStudyModuleSchema.parse({ ...req.body, id });
+
+    // ✅ Check ownership
+    const existingModule = await prisma.studyModule.findUnique({
+      where: { id },
+      include: { lessons: { include: { steps: true } } },
+    });
+
+    if (!existingModule) {
+      return res.status(404).json({ success: false, message: "Module not found" });
+    }
+
+    if (existingModule.createdBy !== (req as any).user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only update your own modules",
+      });
+    }
+
+    // ✅ Extract top-level and nested data
+    const { lessons, ...rest } = validatedData;
+
+    // ✅ Update module itself
+    const updatedModule = await prisma.studyModule.update({
+      where: { id },
+      data: {
+        ...rest,
+        // Prisma handles updatedAt automatically (@updatedAt)
+      },
+    });
+
+    // ✅ Handle nested lessons + steps
+    if (lessons && lessons.length > 0) {
+      for (const lesson of lessons) {
+        // 🧩 Update existing lesson
+        if (lesson.id) {
+          await prisma.studyLesson.update({
+            where: { id: lesson.id },
+            data: {
+              title: lesson.title,
+              lessonNumber: lesson.lessonNumber,
+              content: lesson.content ? JSON.parse(lesson.content) : undefined,
+              minScore: lesson.minScore,
+              maxAttempts: lesson.maxAttempts,
+              xpReward: lesson.xpReward,
+              order: lesson.order,
+            },
+          });
+
+          // 🧩 Update or create lesson steps
+          if (lesson.steps && lesson.steps.length > 0) {
+            for (const step of lesson.steps) {
+              if (step.id) {
+                await prisma.studyStep.update({
+                  where: { id: step.id },
+                  data: {
+                    title: step.title,
+                    type: step.type as any,
+                    stepNumber: step.stepNumber,
+                    content: step.content,
+                    passingScore: step.passingScore,
+                    timeLimit: step.timeLimit ?? null,
+                    order: step.order,
+                  },
+                });
+              } else {
+                // Create new step if it doesn’t exist
+                await prisma.studyStep.create({
+                  data: {
+                    lessonId: lesson.id!,
+                    title: step.title ?? "Untitled Step",
+                    type: step.type as any,
+                    stepNumber: step.stepNumber ?? 1,
+                    content: step.content ?? {},
+                    passingScore: step.passingScore ?? 80,
+                    timeLimit: step.timeLimit ?? null,
+                    order: step.order ?? 1,
+                  },
+                });
+              }
+            }
+          }
+        } else {
+          // 🧩 Create new lesson (if new)
+          const createdLesson = await prisma.studyLesson.create({
+            data: {
+              moduleId: id,
+              title: lesson.title ?? "Untitled Lesson",
+              lessonNumber: lesson.lessonNumber ?? 1,
+              content: lesson.content ? JSON.parse(lesson.content) : {},
+              minScore: lesson.minScore ?? 80,
+              maxAttempts: lesson.maxAttempts ?? 3,
+              xpReward: lesson.xpReward ?? 10,
+              order: lesson.order ?? 1,
+            },
+          });
+
+          // Create nested steps if provided
+          if (lesson.steps && lesson.steps.length > 0) {
+            await prisma.studyStep.createMany({
+              data: lesson.steps.map((step) => ({
+                lessonId: createdLesson.id,
+                title: step.title ?? "Untitled Step",
+                type: step.type as any,
+                stepNumber: step.stepNumber ?? 1,
+                content: step.content ?? {},
+                passingScore: step.passingScore ?? 80,
+                timeLimit: step.timeLimit ?? null,
+                order: step.order ?? 1,
+              })),
+            });
+          }
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: updatedModule,
+      message: "Study module updated successfully",
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: error.errors,
+      });
+    }
+
+    console.error("Update study module error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update study module",
+    });
+  }
+};
+
 
 // Get all study modules
 export const getStudyModules = async (req: Request, res: Response) => {
@@ -1450,7 +1701,7 @@ export const updateModuleProgress = async (req: Request, res: Response) => {
     // Calculate overall progress
     const totalLessons = module.lessons.length;
     const totalSteps = module.lessons.reduce((sum, lesson) => sum + lesson.steps.length, 0);
-    
+
     // Calculate completed steps (all steps before current position)
     let completedSteps = 0;
     for (let i = 0; i < currentLesson - 1; i++) {
@@ -1461,9 +1712,9 @@ export const updateModuleProgress = async (req: Request, res: Response) => {
     }
     // Add steps completed in current lesson
     completedSteps += currentStep - 1;
-    
+
     const overallProgress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
-    
+
     console.log(`📊 Progress calculation: ${completedSteps}/${totalSteps} steps = ${overallProgress}%`);
 
     // Update assignment progress
@@ -2101,17 +2352,17 @@ export const getModuleStudentProgress = async (req: Request, res: Response) => {
     const completionRate =
       totalAssigned > 0
         ? Math.round(
-            (assignments.filter((a) => a.status === 'COMPLETED').length /
-              totalAssigned) *
-              100
-          )
+          (assignments.filter((a) => a.status === 'COMPLETED').length /
+            totalAssigned) *
+          100
+        )
         : 0;
     const averageProgress =
       totalAssigned > 0
         ? Math.round(
-            assignments.reduce((sum, a) => sum + a.overallProgress, 0) /
-              totalAssigned
-          )
+          assignments.reduce((sum, a) => sum + a.overallProgress, 0) /
+          totalAssigned
+        )
         : 0;
     const studentsInProgress = assignments.filter(
       (a) => a.status === 'IN_PROGRESS'
