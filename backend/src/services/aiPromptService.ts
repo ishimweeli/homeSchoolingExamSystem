@@ -105,16 +105,20 @@ const CURRICULUM_MAP: Record<string, CountryCurriculum> = {
   }
 };
 
-export interface StudyModuleGenerationParams {
+interface StudyModuleGenerationParams {
   subject: string;
-  gradeLevel: number; // 0 = All levels, 1-13 (1-12 for K-12, 13 for University)
+  gradeLevel: number;
   topic: string;
   difficulty: string;
   lessonCount: number;
   includeGamification?: boolean;
-  country?: string; // USA, UK, AUSTRALIA, NEW_ZEALAND, RWANDA, GENERAL
-  isPart2?: boolean; // Flag indicating this is Part 2 of a split course
-  part1Topics?: string; // Comma-separated list of topics covered in Part 1
+  country?: string;
+  isPart2?: boolean;
+  part1Topics?: string;
+  // NEW: Batch generation parameters
+  batchStartLesson?: number;
+  totalLessonsInCourse?: number;
+  previousLessons?: string;
 }
 
 export interface AIPromptConfig {
@@ -135,114 +139,104 @@ export function generateStudyModulePrompt(params: StudyModuleGenerationParams): 
     difficulty,
     lessonCount,
     includeGamification = false,
-    country = 'GENERAL', // Default to GENERAL (International)
+    country = 'GENERAL',
     isPart2 = false,
     part1Topics = '',
+    // NEW: Batch parameters
+    batchStartLesson = 1,
+    totalLessonsInCourse = lessonCount,
+    previousLessons = '',
   } = params;
 
-  // Get country-specific curriculum info
   const curriculum = CURRICULUM_MAP[country] || CURRICULUM_MAP['GENERAL'];
   const gradeLabel = getGradeLabel(country, gradeLevel);
-
   const standardCode = curriculum.exampleStandard(subject, gradeLevel, topic);
 
   const systemMessage = `You are a WORLD-CLASS educational content creator (Duolingo + Khan Academy + Coursera quality). Your job: produce curriculum-aligned, age-appropriate, interactive lessons based on ${curriculum.name} (${curriculum.standards}) that parents will GLADLY PAY FOR and students will LOVE. Be thorough but FUN. Ensure clear progression, immediate feedback, and multiple learning styles. Avoid filler. Output VALID JSON only. CRITICAL: Use \\n for newlines in string values, never literal newlines or control characters.`;
 
-  // Different prompt structure based on grade level
   const isCompleteGourse = gradeLevel === 0;
 
+  // Build context about previous lessons
+  let previousLessonsContext = '';
+  if (batchStartLesson > 1 && previousLessons) {
+    previousLessonsContext = `
+    📚 <b>PREVIOUS LESSONS ALREADY COVERED:</b>
+    ${previousLessons}
+    
+    🚫 <b>DO NOT REPEAT THESE TOPICS!</b> Continue the progression naturally.
+    ➡️ You are generating lessons ${batchStartLesson} to ${batchStartLesson + lessonCount - 1} of ${totalLessonsInCourse} total lessons.
+    `;
+  }
+
+  const lessonRangeInfo = batchStartLesson > 1
+    ? `Lessons ${batchStartLesson}-${batchStartLesson + lessonCount - 1} (of ${totalLessonsInCourse} total)`
+    : `Lessons 1-${lessonCount} (of ${totalLessonsInCourse} total)`;
+
   const userPrompt = isCompleteGourse
-    ? `Create a COMPREHENSIVE, CURRICULUM-ALIGNED "Complete Course" for "<b>${topic}</b>" that covers <b>EVERYTHING</b> from ${curriculum.standards} standards. This is a <b>COMPLETE COURSE</b> that follows the official curriculum structure, topics, and subtopics.
+    ? `Create ${lessonCount} CURRICULUM-ALIGNED lessons for "<b>${topic}</b>" (Complete Course).
+    
+    ${previousLessonsContext}
 
     SPECIFICATIONS:
     - Country: ${curriculum.name}
     - Curriculum Standards: ${curriculum.standards}
     - Subject: ${subject}
-    - Level: ${gradeLabel} (COMPLETE COURSE - ALL LEVELS)
+    - Level: ${gradeLabel} (COMPLETE COURSE)
     - Topic: ${topic}
-    - Number of Lessons: ${lessonCount}
+    - Generating: ${lessonRangeInfo}
     ${includeGamification ? '- Include gamification elements (XP points, achievements, streaks)' : ''}
-    ${isPart2 ? `
-    
-    ⚠️ <b>CRITICAL:</b> This is <b>PART 2</b> of a split course!
-    📋 PART 1 ALREADY COVERED: ${part1Topics}
-    
-    🚫 DO NOT REPEAT THESE TOPICS! You MUST continue with the NEXT curriculum topics in sequence.
-    ➡️ START where Part 1 left off and cover the REMAINING curriculum topics for "<b>${topic}</b>".
-    ` : ''}
 
-    🎯 <b>CRITICAL:</b> This is a COMPLETE CURRICULUM-BASED COURSE! Follow the OFFICIAL ${curriculum.standards} structure for "<b>${topic}</b>".
+    🎯 <b>CRITICAL:</b> This is part of a COMPLETE CURRICULUM-BASED COURSE following ${curriculum.standards}.
 
     🧠 <b>RICH TEXT FORMATTING RULE (MANDATORY)</b>:
     - All <b>theory</b> fields must be formatted in HTML-rich text (<p>, <b>, <i>, <u>, <br>).
     - All <b>objectives</b> must use rich text bullet format with <li> tags.
-    - All <b>explanations</b> in exercises must be rich text using <b>, <i>, <u> for emphasis and clarity.
-    - JSON values must remain strings (no markdown fences, no escaping of tags).
+    - All <b>explanations</b> in exercises must be rich text using <b>, <i>, <u> for emphasis.
+    - All <b>learningText</b> must contain AT LEAST 2 FULL PARAGRAPHS (minimum 4-6 sentences each).
 
-    📚 <b>CURRICULUM STRUCTURE (MANDATORY)</b>:
-    - Base lessons on OFFICIAL curriculum topics and subtopics for "<b>${topic}</b>"
-    - Follow the standard progression as defined in ${curriculum.standards}
+    📖 <b>LEARNING TEXT REQUIREMENTS (MANDATORY)</b>:
+    Every step with a question MUST include a <b>learningText</b> property:
+    - <b>MINIMUM 2 PARAGRAPHS</b> of educational content (wrapped in <p> tags)
+    - Each paragraph should be 4-6 sentences explaining the concept thoroughly
+    - Use <b>bold</b> for key terms, <i>italics</i> for examples, <u>underline</u> for important rules
+    
+    📚 <b>CURRICULUM STRUCTURE</b>:
+    - Base lessons on OFFICIAL curriculum topics for "${topic}"
+    - Follow standard progression from ${curriculum.standards}
     - Each lesson = one major curriculum topic/subtopic
-    - Include foundational → advanced concepts in proper order
-
-    ✅ <b>COMPLETE COVERAGE REQUIRED</b>:
-    Example:
-    - Lesson 1: <b>Introduction & Fundamentals</b>
-    - Lessons 2–4: <b>Core Concepts</b>
-    - Lessons 5–7: <b>Advanced Concepts</b>
-    - Lessons 8–9: <b>Special Cases & Exceptions</b>
-    - Lesson 10: <b>Real-World Applications & Mastery</b>
+    - Ensure logical progression from lesson ${batchStartLesson}
 
     ✨ <b>Each lesson must include:</b>
     1. 📚 <b>Engaging theory (rich text, curriculum-aligned)</b>
-    2. 🎮 8–12 <b>interactive exercises</b>
-    3. 🎯 <b>Mini-quiz</b> after every 2–3 exercises
-    4. 💡 <b>Rich text learning objectives</b>
-    5. 🔑 <b>Key terms</b>
-    6. 💬 <b>Encouraging feedback</b>
-    7. 🌟 <b>Tips, tricks, mnemonics</b>
+    2. 🎮 8 <b>interactive exercises with learningText</b>
+    3. 💡 <b>Rich text learning objectives</b>
+    4. 🔑 <b>Key terms</b>
+    5. 💬 <b>Encouraging feedback</b>
 
-    🚀 <b>CURRICULUM-BASED PROGRESSION</b>:
-    - Follow official topic sequence
-    - Cover all required subtopics in curriculum order
-    - Build lessons progressively with full coverage
-
-    💎 <b>QUALITY RULES (AUTO-GRADABLE ONLY)</b>:
-    - Use only multiple_choice, fill-in-the-blank, true_false, matching, ordering
-    - Explanations must be in <b>rich text</b> form with <b>, <i>, <u> tags
-
-    Each lesson = exactly 8 steps:
-      1) THEORY - Rich text explanation with 3–5 examples
-      2) PRACTICE_EASY - multiple choice
-      3) PRACTICE_EASY - fill-in-the-blank
-      4) PRACTICE_EASY - true/false
-      5) PRACTICE_MEDIUM - matching pairs
-      6) PRACTICE_MEDIUM - multiple choice (harder)
-      7) PRACTICE_HARD - fill-in-blank or ordering
-      8) QUIZ - mixed questions
-
-    📋 <b>EXPLANATION FORMATTING (MANDATORY)</b>:
-    - Wrap each explanation in <p> tags
-    - Use <b>bold</b> for correct answers, <i>italics</i> for examples, <u>underline</u> for rules
-    - Example:
-      "<p><b>A</b> is correct because it follows the present simple rule. <u>B</u> is incorrect due to missing -s.</p>"
+    💎 <b>Lesson Format (8 Steps)</b>:
+    1) THEORY – rich text with 3–5 examples
+    2) PRACTICE_EASY – multiple choice with learningText (2+ paragraphs)
+    3) PRACTICE_EASY – fill-in-the-blank with learningText (2+ paragraphs)
+    4) PRACTICE_EASY – true/false with learningText (2+ paragraphs)
+    5) PRACTICE_MEDIUM – matching pairs with learningText (2+ paragraphs)
+    6) PRACTICE_MEDIUM – multiple choice (harder) with learningText (2+ paragraphs)
+    7) PRACTICE_HARD – ordering or fill-in-blank with learningText (2+ paragraphs)
+    8) QUIZ – mixed questions with learningText (2+ paragraphs)
 
     ✅ <b>OUTPUT JSON STRUCTURE</b> (no markdown fences, JSON only):
     {
-      "title": "Complete Course: ${topic} - All Levels",
-      "description": "Comprehensive, rich-text, curriculum-aligned course covering all aspects of ${topic}.",
       "lessons": [{
-        "lessonNumber": 1,
+        "lessonNumber": ${batchStartLesson},
         "title": "Lesson Title (Curriculum Topic)",
         "content": {
-          "theory": "<p>Rich text explanation aligned with ${curriculum.standards}, using <b>, <i>, and <u> where appropriate.</p>",
+          "theory": "<p>Rich text explanation aligned with ${curriculum.standards}</p>",
           "objectives": [
             "<li><b>Understand</b> how to...</li>",
             "<li><b>Apply</b> the rule in context.</li>"
           ],
           "keyTerms": ["<b>Term1</b>", "<b>Term2</b>"],
           "curriculumAlignment": [
-            { "standardCode": "${standardCode}", "description": "Specific ${curriculum.standards} standard covered." }
+            { "standardCode": "${standardCode}", "description": "Specific ${curriculum.standards} standard." }
           ]
         },
         "steps": [
@@ -250,122 +244,162 @@ export function generateStudyModulePrompt(params: StudyModuleGenerationParams): 
             "type": "THEORY",
             "title": "Introduction to [Concept]",
             "content": {
-              "text": "<p>Theory explanation in <b>rich text</b> with <i>examples</i> and <u>rules</u>.</p>",
-              "examples": ["<i>Example 1:</i> correct use", "<i>Example 2:</i> variation", "<i>Example 3:</i> exception"]
+              "text": "<p>Theory with <b>rich text</b> and <i>examples</i>.</p>",
+              "examples": ["<i>Example 1</i>", "<i>Example 2</i>", "<i>Example 3</i>"]
             }
           },
           {
             "type": "PRACTICE_EASY",
             "title": "Recognition Practice",
             "content": {
+              "learningText": "<p>First paragraph: Detailed explanation...</p><p>Second paragraph: Additional depth...</p>",
               "type": "multiple_choice",
               "question": "Which sentence demonstrates [concept] correctly?",
-              "options": ["A) Correct example", "B) Common mistake", "C) Variation", "D) Unrelated"],
+              "options": ["A) Correct", "B) Wrong", "C) Wrong", "D) Wrong"],
               "correctAnswer": "A",
-              "explanation": "<p><b>A</b> is correct because it follows the rule. <u>B</u> and <u>C</u> are incorrect due to wrong tense usage.</p>"
+              "explanation": "<p><b>A</b> is correct because...</p>"
             }
-          }
+          },
+          {
+            "type": "PRACTICE_MEDIUM",
+            "title": "Matching Pairs",
+            "content": {
+              "learningText": "<p>First paragraph: Detailed explanation...</p><p>Second paragraph: Additional depth...</p>",
+              "type": "matching",
+              "pairs": [
+                { "left": "Term 1", "right": "Definition 1" },
+                { "left": "Term 2", "right": "Definition 2" },
+                { "left": "Term 3", "right": "Definition 3" },
+                { "left": "Term 4", "right": "Definition 4" }
+              ],
+              "explanation": "<p>Matches: <b>Term 1 → Definition 1</b>, <b>Term 2 → Definition 2</b>, etc.</p>"
+            }
+          },
+          {
+            "type": "PRACTICE_HARD",
+            "title": "Complex Application",
+            "content": {
+              "learningText": "<p>In English question formation, the <b>word order</b> follows a specific pattern. Typically, a <b>question word</b> (like 'where', 'what', 'when') comes first, followed by the <b>auxiliary verb</b> (like 'does', 'do', 'is'), then the <b>subject</b>, and finally the <b>main verb</b>. This structure helps listeners immediately recognize that a question is being asked.</p><p>When rearranging words, always start by identifying the <b>question word</b>. Next, find the <b>helping verb</b> (such as 'does' or 'is'), and then place the <b>subject</b> before the <b>main verb</b>. For example, <i>'Where does she work?'</i> follows this exact pattern.</p>",
+              "type": "ordering",
+              "question": "Put these words in order to form a correct question:",
+              "items": ["does", "where", "she", "work", "?"],
+              "correctOrder": ["where", "does", "she", "work", "?"],
+              "explanation": "<p>The correct order is <b>'Where does she work?'</b>. The pattern is: <u>Question word + auxiliary + subject + base verb</u>.</p>"
+            }
+          },
+           {
+            "type": "PRACTICE_EASY",
+            "title": "Fill in the Blank",
+            "content": {
+              "type": "fill-in-the-blank",
+              "question": "She ___ (eat) breakfast every morning.",
+              "correctAnswer": "eats",
+              "explanation": "Present simple with she/he/it adds -s to the verb."
+            }
+          },
         ]
-      }],
-      "xpRewards": {
-        "perLesson": 15,
-        "completion": 200
-      },
-      "badges": ["Curriculum Beginner", "Curriculum Intermediate", "Curriculum Expert", "Master"]
+      }]
     }`
+    : `Create ${lessonCount} WORLD-CLASS, rich-text lessons for "<b>${topic}</b>".
 
-
-    : `Create a WORLD-CLASS, rich-text, Duolingo-style interactive module for "<b>${topic}</b>" that PARENTS will buy and STUDENTS will LOVE learning from.
+    ${previousLessonsContext}
 
     SPECIFICATIONS:
     - Country: ${curriculum.name}
-    - Curriculum Standards: ${curriculum.standards}
     - Subject: ${subject}
-    - Grade Level: ${gradeLabel}
+    - Grade: ${gradeLabel}
     - Topic: ${topic}
     - Difficulty: ${difficulty}
-    - Number of Lessons: ${lessonCount}
-    ${includeGamification ? '- Include gamification elements (XP, achievements, streaks)' : ''}
-    ${isPart2 ? `
-    
-    ⚠️ <b>PART 2</b> of split module! Previously covered: ${part1Topics}
-    🚫 Do not repeat topics. Continue with new ones.
-    ` : ''}
+    - Generating: ${lessonRangeInfo}
+    ${includeGamification ? '- Include gamification elements' : ''}
 
     🎯 <b>RICH TEXT REQUIREMENTS (MANDATORY)</b>:
-    - <b>Theory</b>, <b>Objectives</b>, and <b>Explanations</b> must all use HTML-rich text (<b>, <i>, <u>, <p>).
-    - Format explanations like:
-      "<p><b>Correct:</b> because... <i>Incorrect:</i> violates rule...</p>"
+    - <b>Theory</b>, <b>Objectives</b>, <b>Explanations</b>, and <b>learningText</b> must all use HTML-rich text.
+    - <b>learningText MUST contain AT LEAST 2 PARAGRAPHS</b> (4-6 sentences each)
+
+    📖 <b>LEARNING TEXT REQUIREMENTS (MANDATORY)</b>:
+    Every practice step MUST include <b>learningText</b> with:
+    - Minimum 2 full paragraphs (each 4-6 sentences) wrapped in <p> tags
+    - Use <b>bold</b> for key terms, <i>italics</i> for examples, <u>underline</u> for rules
 
     💎 <b>Lesson Format (8 Steps)</b>:
     1) THEORY – rich text with 3–5 examples
-    2) PRACTICE_EASY – multiple choice
-    3) PRACTICE_EASY – fill-in-the-blank
-    4) PRACTICE_EASY – true/false
-    5) PRACTICE_MEDIUM – matching
-    6) PRACTICE_MEDIUM – multiple choice (advanced)
-    7) PRACTICE_HARD – ordering or complex fill-in
-    8) QUIZ – mixed review
+    2) PRACTICE_EASY – multiple choice with learningText
+    3) PRACTICE_EASY – fill-in-the-blank with learningText
+    4) PRACTICE_EASY – true/false with learningText
+    5) PRACTICE_MEDIUM – matching with learningText
+    6) PRACTICE_MEDIUM – multiple choice (advanced) with learningText
+    7) PRACTICE_HARD – ordering or complex fill-in with learningText
+    8) QUIZ – mixed review with learningText
 
     ✅ <b>OUTPUT JSON STRUCTURE</b>:
     {
-      "title": "Module Title",
-      "description": "Rich-text interactive module on ${topic}.",
       "lessons": [{
-        "lessonNumber": 1,
+        "lessonNumber": ${batchStartLesson},
         "title": "Lesson Title",
         "content": {
-          "theory": "<p>Rich text explanation with <b>key ideas</b> and <i>examples</i>.</p>",
-          "objectives": [
-            "<li><b>Recognize</b> and <b>use</b> ${topic} correctly.</li>",
-            "<li><b>Apply</b> ${topic} in real contexts.</li>"
-          ],
-          "keyTerms": ["<b>Term1</b>", "<b>Term2</b>"],
-          "curriculumAlignment": [
-            { "standardCode": "", "description": "Aligned with ${curriculum.standards}." }
-          ]
+          "theory": "<p>Rich text with <b>key ideas</b> and <i>examples</i>.</p>",
+          "objectives": ["<li><b>Recognize</b> ${topic}</li>"],
+          "keyTerms": ["<b>Term1</b>"],
+          "curriculumAlignment": [{ "standardCode": "", "description": "Aligned with ${curriculum.standards}." }]
         },
         "steps": [{
           "type": "THEORY",
           "title": "Introduction",
           "content": {
-            "text": "<p>Theory content with <b>rules</b>, <i>examples</i>, and <u>exceptions</u>.</p>",
-            "examples": ["<i>Example 1:</i> simple case", "<i>Example 2:</i> advanced usage"]
+            "text": "<p>Theory content</p>",
+            "examples": ["<i>Example 1</i>"]
           }
         }, {
           "type": "PRACTICE_EASY",
           "title": "Practice",
           "content": {
-            "question": "Which sentence is correct?",
+            "learningText": "<p>First paragraph...</p><p>Second paragraph...</p>",
+            "question": "Which is correct?",
             "type": "multiple_choice",
-            "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+            "options": ["A) ...", "B) ..."],
             "correctAnswer": "A",
-            "explanation": "<p><b>A</b> is correct because... <i>B</i> and <i>C</i> are wrong due to rule violation.</p>"
+            "explanation": "<p><b>A</b> is correct...</p>"
+          }
+        }, {
+          "type": "PRACTICE_MEDIUM",
+          "title": "Matching Pairs",
+          "content": {
+            "learningText": "<p>First paragraph: Detailed explanation...</p><p>Second paragraph: Additional depth...</p>",
+            "type": "matching",
+            "pairs": [
+              { "left": "go", "right": "went" },
+              { "left": "watch", "right": "watched" },
+              { "left": "have", "right": "had" },
+              { "left": "stop", "right": "stopped" }
+            ],
+            "explanation": "<p>Matches: <b>go → went</b>, <b>watch → watched</b> (regular, add <u>-ed</u>), <b>have → had</b> (irregular), <b>stop → stopped</b> (regular with doubled consonant).</p>"
+          }
+        }, {
+          "type": "PRACTICE_HARD",
+          "title": "Complex Application",
+          "content": {
+            "learningText": "<p>In English question formation, the <b>word order</b> follows a specific pattern. Typically, a <b>question word</b> (like 'where', 'what', 'when') comes first, followed by the <b>auxiliary verb</b> (like 'does', 'do', 'is'), then the <b>subject</b>, and finally the <b>main verb</b>. This structure helps listeners immediately recognize that a question is being asked.</p><p>When rearranging words, always start by identifying the <b>question word</b>. Next, find the <b>helping verb</b> (such as 'does' or 'is'), and then place the <b>subject</b> before the <b>main verb</b>. For example, <i>'Where does she work?'</i> follows this exact pattern.</p>",
+            "type": "ordering",
+            "question": "Put these words in order to form a correct question:",
+            "items": ["does", "where", "she", "work", "?"],
+            "correctOrder": [1, 0, 2, 3, 4],
+            "explanation": "<p>The correct order is <b>'Where does she work?'</b>. The pattern is: <u>Question word + auxiliary + subject + base verb</u>.</p>"
           }
         }]
-      }],
-      "xpRewards": {
-        "perLesson": 10,
-        "completion": 100
-      },
-      "badges": ["Beginner", "Intermediate", "Expert"]
+      }]
     }`;
 
-  // Adaptive max_tokens based on course type
-  // Reduced to prevent OpenRouter API timeouts and incomplete JSON responses
-  // For large courses, the split-and-merge strategy (line 162+) handles >12 lessons
-  // - Complete Course (grade 0): Use 25K tokens per request (safe for 10-12 lessons)
-  // - Regular grade courses: Use 20K tokens for focused lessons
-  const maxTokens = isCompleteGourse ? 25000 : 20000;
+  // Reduced token count for smaller batches (2 lessons at a time)
+  const maxTokens = 12000; // Sufficient for 2 detailed lessons
 
   return {
     systemMessage,
     userPrompt,
-    temperature: 0.8, // Balanced creativity for educational variety
+    temperature: 0.8,
     maxTokens,
   };
 }
-
 /**
  * Generate AI prompt for exam question generation
  * Can be extended in the future for exam creation

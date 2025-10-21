@@ -435,7 +435,7 @@ const ModuleEdit = () => {
 
                 <div  className="flex justify-between items-center">
                     {/* Add Lesson Button */}
-                    <Button type="button" onClick={addLesson} >
+                    <Button type="button" onClick={addLesson} className="bg-gray-700 text-white flex items-center gap-2">
                         <Plus size={16} /> Add Lesson
                     </Button>
 

@@ -8,7 +8,6 @@ interface RichTextProps {
 }
 
 const RichText: React.FC<RichTextProps> = ({ html, className }) => {
-    console.log("RichText received HTML:", html); // 👈 Add this
     const sanitized = React.useMemo(() => DOMPurify.sanitize(html), [html]);
     return (
         <div

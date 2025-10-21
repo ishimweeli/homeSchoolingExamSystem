@@ -102,6 +102,7 @@ export default function ModuleTaker() {
     let correct = false;
 
     const normalizeText = (text: string): string => {
+      console.log('Normalizing text:', text);
       return text
         .trim()
         .toLowerCase()
@@ -121,6 +122,7 @@ export default function ModuleTaker() {
       case 'fill-in-the-blank':
       case 'fill_in_blank':
       case 'text_entry':
+      case 'fill_in_the_blank':
         const userNormalized = normalizeText(userAnswer);
         const correctNormalized = normalizeText(content.correctAnswer);
         correct = userNormalized === correctNormalized;
@@ -143,6 +145,7 @@ export default function ModuleTaker() {
       case 'ordering':
         if (Array.isArray(content.correctOrder) && Array.isArray(orderingItems)) {
           correct = JSON.stringify(orderingItems) === JSON.stringify(content.correctOrder);
+          console.log('Ordering check:', { orderingItems, correctOrder: content.correctOrder, correct });
         }
         break;
       default:
@@ -394,7 +397,7 @@ export default function ModuleTaker() {
       return (
         <div className="space-y-6">
           <div className="bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-lg">
-          <p className='text-lg font-boldzz'>Explanation</p>
+            <p className='text-lg font-boldzz'>Explanation</p>
             <p className=' font-sans my-4'>
               <RichText
                 html={content.learningText}
@@ -432,7 +435,9 @@ export default function ModuleTaker() {
 
             {(content.type === 'fill-in-the-blank' ||
               content.type === 'fill_in_blank' ||
-              content.type === 'text_entry') && (
+              content.type === 'text_entry' ||
+              content.type === "fill_in_the_blank"
+            ) && (
                 <input
                   type="text"
                   value={userAnswer}
@@ -469,24 +474,26 @@ export default function ModuleTaker() {
             )}
 
             {content.type === 'matching' && content.pairs && (
-              <MatchingActivity
-                content={content}
-                showFeedback={showFeedback}
-                onCheck={(matches, isCorrect) => {
-                  setUserAnswer(matches);
-                  setIsCorrect(isCorrect);
-                  setShowFeedback(true);
+              <>
+                <MatchingActivity
+                  content={content}
+                  showFeedback={showFeedback}
+                  onCheck={(matches, isCorrect) => {
+                    setUserAnswer(matches);
+                    setIsCorrect(isCorrect);
+                    setShowFeedback(true);
 
-                  if (!isCorrect && assignment && module?.livesEnabled) {
-                    const newLives = Math.max(0, (assignment.lives || module.maxLives) - 1);
-                    setAssignment({ ...assignment, lives: newLives });
-                    toast.error('❌ Some matches are incorrect. Lost 1 life.');
-                  } else if (isCorrect) {
-                    toast.success('✅ Correct matches!');
-                  }
-                }}
-                revealCorrectOnFail={true}
-              />
+                    if (!isCorrect && assignment && module?.livesEnabled) {
+                      const newLives = Math.max(0, (assignment.lives || module.maxLives) - 1);
+                      setAssignment({ ...assignment, lives: newLives });
+                      toast.error('❌ Some matches are incorrect. Lost 1 life.');
+                    } else if (isCorrect) {
+                      toast.success('✅ Correct matches!');
+                    }
+                  }}
+                  revealCorrectOnFail={true}
+                />
+              </>
             )}
 
             {/* ORDERING Question Type */}
