@@ -33,6 +33,9 @@ import AdminTiers from './pages/AdminTiers'
 import RequireRole from './components/RequireRole'
 import Forbidden from './pages/Forbidden'
 import ModuleEdit from './pages/ModuleEdit'
+import Teachers from './pages/InvitePage'
+import AcceptInvite from './pages/AcceptInvite'
+import Organization from './components/Layout'
 
 function App() {
   return (
@@ -48,11 +51,14 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/resend-verification" element={<ResendVerification />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/accept-invite" element={<AcceptInvite />} />
+  
 
         {/* Protected routes with shared layout */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
         <Route path="/exams" element={<ProtectedRoute><Exams /></ProtectedRoute>} />
+        <Route path="/invites" element={<ProtectedRoute><Teachers /></ProtectedRoute>} />
         <Route path="/exams/create" element={<ProtectedRoute><ExamCreate /></ProtectedRoute>} />
         <Route path="/exams/create-simple" element={<ProtectedRoute><ExamCreateSimple /></ProtectedRoute>} />
         {/* Consolidated exam creation under /exams/create */}
@@ -72,6 +78,7 @@ function App() {
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
         <Route path="/admin/tiers" element={<ProtectedRoute>
+        
           <RequireRole allowedRoles={['ADMIN']}>
             <AdminTiers />
           </RequireRole>

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import passport from '../config/passport';
-import { register, login, refreshToken, getProfile, updateProfile, googleCallback, requestPasswordReset, resetPassword, resendVerification, verifyEmail, me, logout } from '../controllers/authController';
+import { register, login, refreshToken, getProfile, updateProfile, googleCallback, requestPasswordReset, resetPassword, resendVerification, verifyEmail, me, logout, getUserOrganizations } from '../controllers/authController';
 import { verifyToken } from '../middleware/auth';
 import { authRateLimiter } from '../middleware/rateLimiter';
 
@@ -17,6 +17,7 @@ router.post('/forgot-password', requestPasswordReset);
 router.post('/reset-password', resetPassword);
 router.post('/resend-verification', resendVerification);
 router.get('/verify-email', verifyEmail);
+router.get('/organizations', verifyToken, getUserOrganizations);
 
 // Google OAuth2
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));

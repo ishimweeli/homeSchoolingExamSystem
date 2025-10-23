@@ -1,19 +1,28 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 
+interface LocationState {
+  email?: string;
+  inviteCode?: string;
+}
 export default function Register() {
   const navigate = useNavigate()
   const { register, isLoading, error, clearError } = useAuthStore()
+
+ 
+const location = useLocation();
+const state = location.state as LocationState | undefined;
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     username: '',
     password: '',
     confirmPassword: '',
-    role: 'PARENT'
+    role: 'PARENT',
   })
+   const [inviteCode] = useState(state?.inviteCode || '');
   const [showPassword, setShowPassword] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -21,24 +30,31 @@ export default function Register() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    clearError()
+   const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearError();
+
     if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match')
-      return
+      toast.error('Passwords do not match');
+      return;
     }
+
     try {
+      // Include inviteCode if present
       await register({
         name: formData.name,
         email: formData.email,
         username: formData.username || undefined,
         password: formData.password,
         role: formData.role,
-      })
-      navigate('/onboarding')
-    } catch (_) {}
-  }
+        inviteCode: inviteCode || undefined,
+      });
+
+      navigate('/onboarding');
+    } catch (_) {
+      // error handled in store
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
@@ -104,11 +120,17 @@ export default function Register() {
                 name="role"
                 value={formData.role}
                 onChange={handleChange}
+                required
                 className="w-full rounded-xl border border-gray-300 px-4 py-3 bg-white focus:ring-2 focus:ring-blue-500"
               >
-                <option value="PARENT">Parent/Teacher</option>
-                <option value="STUDENT">Student</option>
+                <option value="" disabled>
+                  Select role
+                </option>
+                <option value="PARENT">Parent</option>
+                <option value="TEACHER">Teacher</option>
+                <option value="ADMIN">School</option>
               </select>
+
             </div>
 
             <div>

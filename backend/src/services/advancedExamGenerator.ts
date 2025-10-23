@@ -32,7 +32,7 @@ interface AdvancedExamConfig {
   sections: SectionConfig[];
 }
 
-export async function generateAdvancedExam(config: AdvancedExamConfig, creatorId: string) {
+export async function generateAdvancedExam(config: AdvancedExamConfig, creatorId: string, orgId: string) {
   const { title, subject, gradeLevel, duration, sections } = config;
 
   // Create exam
@@ -184,7 +184,7 @@ Make questions engaging, grade-appropriate, and educational.`;
 }
 
 // PDF Upload and Recreation
-export async function recreateExamFromPDF(pdfText: string, creatorId: string) {
+export async function recreateExamFromPDF(pdfText: string, creatorId: string, orgId: string) {
   const prompt = `Analyze this exam PDF text and extract its structure:
 
 ${pdfText}
@@ -239,7 +239,7 @@ Extract ALL questions with their exact text, options, and structure. Preserve se
     const examConfig = JSON.parse(responseText);
 
     // Generate exam using the extracted structure
-    return generateAdvancedExam(examConfig, creatorId);
+    return generateAdvancedExam(examConfig, creatorId, orgId);
   } catch (error) {
     console.error('Error recreating exam from PDF:', error);
     throw new Error(`Failed to recreate exam from PDF: ${error.message}`);

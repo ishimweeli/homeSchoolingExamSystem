@@ -1,74 +1,107 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   BookOpen, Users, FileText, Brain, BarChart3, Settings,
-  LogOut, Menu, X, Home, Calendar, Award, TrendingUp,
-  Clock, CheckCircle, AlertCircle, Sparkles, User, GraduationCap,
-  BookMarked, Activity, Target, Zap, Search, Filter, ChevronRight,
-  Edit, Trash2, Eye, Download, Upload, RefreshCw, ArrowUp, ArrowDown,
-  PenTool, FolderOpen, MoreVertical, ChevronDown, CreditCard
+  LogOut, Menu, X, Home, CreditCard, ChevronDown, GraduationCap, RefreshCw, User, Building2
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-
-// Local type used only for role-based UI rendering
-interface UserShape {
-  id: string;
-  name: string;
-  email: string;
-  role: 'STUDENT' | 'TEACHER' | 'PARENT' | 'ADMIN';
-  avatar?: string;
-}
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
+// Role mapping from backend membership roles to frontend roles
+const mapOrgRoleToUIRole = (orgRole?: string) => {
+  switch (orgRole) {
+    case 'OWNER':
+      return 'ADMIN'; // Treat OWNER as ADMIN in UI
+    case 'TEACHER':
+      return 'TEACHER';
+    case 'PARENT':
+      return 'PARENT';
+    default:
+      return 'STUDENT';
+  }
+};
+
 export default function Layout({ children }: LayoutProps) {
-  const { user: authUser, isAuthenticated, fetchProfile, logout } = useAuthStore();
-  const user = (authUser as unknown as UserShape) || null;
+  const {
+    user: authUser,
+    isAuthenticated,
+    fetchProfile,
+    logout,
+    organizations = [],
+    activeOrg,
+    fetchOrganizations,
+    switchOrganization
+  } = useAuthStore();
+
+  const user = authUser || null;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [showOrgMenu, setShowOrgMenu] = useState(false);
+
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const orgMenuRef = useRef<HTMLDivElement>(null);
+
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Determine UI role based on active organization
+ const userRole = mapOrgRoleToUIRole((activeOrg as any)?.role || 'STUDENT');
+
+
+  // Ensure authenticated and load organizations
   useEffect(() => {
-    ensureUser();
+    const init = async () => {
+      if (!isAuthenticated || !authUser) {
+        try {
+          await fetchProfile();
+        } catch (_) {
+          navigate('/login');
+          return;
+        }
+      }
+      await fetchOrganizations();
+    };
+    init();
   }, []);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setShowUserMenu(false);
       }
+      if (orgMenuRef.current && !orgMenuRef.current.contains(event.target as Node)) {
+        setShowOrgMenu(false);
+      }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const ensureUser = async () => {
-    if (!isAuthenticated || !authUser) {
-      try {
-        await fetchProfile();
-      } catch (_) {
-        navigate('/login');
-      }
-    }
-  };
-
   const handleLogout = () => {
     logout();
-    setShowUserMenu(false);
     navigate('/login');
   };
 
+  const handleOrgSwitch = (orgId: string) => {
+    switchOrganization(orgId);
+    setShowOrgMenu(false);
+    localStorage.setItem('activeOrgId', orgId);
+    window.location.reload();
+  };
+
+  const handleRefresh = () => window.location.reload();
+
+  // Sidebar items with roles
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/dashboard', roles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'] },
     { id: 'exams', label: 'Exams', icon: FileText, path: '/exams', roles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'] },
     { id: 'modules', label: 'Study Modules', icon: BookOpen, path: '/modules', roles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'] },
     { id: 'students', label: 'Students', icon: Users, path: '/students', roles: ['TEACHER', 'PARENT', 'ADMIN'] },
+    { id: 'invites', label: 'Invites', icon: Users, path: '/invites', roles: ['ADMIN', 'TEACHER'] },
     { id: 'subscription', label: 'Subscription', icon: CreditCard, path: '/subscription', roles: ['TEACHER', 'PARENT', 'ADMIN'] },
     { id: 'ai-tools', label: 'AI Tools', icon: Brain, path: '/ai-tools', roles: ['TEACHER', 'ADMIN'] },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics', roles: ['TEACHER', 'PARENT', 'ADMIN'] },
@@ -76,34 +109,24 @@ export default function Layout({ children }: LayoutProps) {
     { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', roles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'] },
   ];
 
+  // Filter sidebar items by current UI role
   const filteredSidebarItems = sidebarItems.filter(item =>
-    item.roles.includes(user?.role || 'STUDENT')
+    item.roles.includes(userRole)
   );
 
-  const isActiveRoute = (path: string) => {
-    if (path === '/dashboard') {
-      return location.pathname === '/dashboard';
-    }
-    return location.pathname.startsWith(path);
-  };
+  const isActiveRoute = (path: string) =>
+    path === '/dashboard'
+      ? location.pathname === '/dashboard'
+      : location.pathname.startsWith(path);
 
-  // Derive current page title from active route
   const currentItem = sidebarItems.find(item => isActiveRoute(item.path));
   const pageTitle = currentItem?.label || 'Dashboard';
-
-  const handleRefresh = () => {
-    try {
-      // Simple full refresh to re-fetch page data
-      window.location.reload();
-    } catch (_) {
-      // no-op
-    }
-  };
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Sidebar */}
       <div className={`${sidebarOpen ? 'w-72' : 'w-20'} bg-white shadow-xl transition-all duration-300 flex flex-col border-r border-gray-200`}>
+        {/* Logo Section */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className={`flex items-center ${!sidebarOpen && 'justify-center'}`}>
@@ -128,12 +151,71 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </div>
 
+        {/* Organization Switcher */}
+        {organizations.length > 0 && (
+          <div className={`border-b border-gray-200 ${sidebarOpen ? 'p-4' : 'p-2'}`}>
+            <div className="relative" ref={orgMenuRef}>
+              {sidebarOpen ? (
+                <button
+                  onClick={() => setShowOrgMenu(!showOrgMenu)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 rounded-lg transition-colors group border border-purple-200"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Building2 className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                    <div className="text-left min-w-0">
+                      <p className="text-xs text-gray-500 font-medium">Organization</p>
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {activeOrg?.name || 'Select Organization'}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowOrgMenu(!showOrgMenu)}
+                  className="w-full flex items-center justify-center p-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 rounded-lg transition-colors border border-purple-200"
+                  title={activeOrg?.name || 'Select Organization'}
+                >
+                  <Building2 className="w-5 h-5 text-purple-600" />
+                </button>
+              )}
+
+              {showOrgMenu && (
+                <div className={`absolute ${sidebarOpen ? 'left-0 right-0' : 'left-full ml-2'} mt-2 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden`}>
+                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                    <p className="text-xs font-semibold text-gray-700">Switch Organization</p>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {organizations.map(org => (
+                      <button
+                        key={org.id}
+                        onClick={() => handleOrgSwitch(org.id)}
+                        className={`w-full text-left px-3 py-2.5 text-sm hover:bg-purple-50 transition-colors ${
+                          org.id === activeOrg?.id
+                            ? 'bg-purple-50 text-purple-700 font-semibold'
+                            : 'text-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Building2 className={`w-4 h-4 ${org.id === activeOrg?.id ? 'text-purple-600' : 'text-gray-400'}`} />
+                          <p className="truncate">{org.name}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Navigation */}
         <nav className="flex-1 p-4 overflow-y-auto">
           <ul className="space-y-2">
             {filteredSidebarItems.map(item => {
               const Icon = item.icon;
               const isActive = isActiveRoute(item.path);
-              
               return (
                 <li key={item.id}>
                   <button
@@ -164,9 +246,12 @@ export default function Layout({ children }: LayoutProps) {
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200">
           <div className="px-6 py-4 flex items-center justify-between">
             <div className="min-w-0">
-              <div className="text-xs text-gray-500">Mwalimu Tools</div>
-              <h2 className="text-lg md:text-xl font-semibold text-gray-900 truncate">{pageTitle}</h2>
+              <div className="text-xs text-gray-500 mb-1">Mwalimu Tools</div>
+              <h2 className="text-lg md:text-xl font-semibold text-gray-900 truncate">
+                {pageTitle}
+              </h2>
             </div>
+
             <div className="flex items-center gap-3">
               <button
                 onClick={handleRefresh}
@@ -175,9 +260,9 @@ export default function Layout({ children }: LayoutProps) {
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
-              
+
               {/* User Profile Dropdown */}
-              <div className="relative" ref={menuRef}>
+              <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
@@ -189,13 +274,13 @@ export default function Layout({ children }: LayoutProps) {
                   </div>
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </button>
-                
+
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
                     <div className="px-4 py-3 border-b border-gray-100">
                       <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
                       <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                      <p className="text-xs text-purple-600 font-medium capitalize mt-1">{user?.role?.toLowerCase()}</p>
+                      <p className="text-xs text-purple-600 font-medium capitalize mt-1">{userRole.toLowerCase()}</p>
                     </div>
                     <button
                       onClick={() => {
@@ -222,9 +307,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
 
         {/* Page Content */}
-        <div className="p-6">
-          {children}
-        </div>
+        <div className="p-6">{children}</div>
       </div>
     </div>
   );

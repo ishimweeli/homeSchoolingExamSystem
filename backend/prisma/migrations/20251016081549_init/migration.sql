@@ -37,6 +37,9 @@ CREATE TYPE "StepType" AS ENUM ('THEORY', 'PRACTICE_EASY', 'PRACTICE_MEDIUM', 'P
 -- CreateEnum
 CREATE TYPE "ModuleStatus" AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'PAUSED');
 
+-- CreateEnum
+CREATE TYPE "ModulePublishStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
@@ -49,7 +52,6 @@ CREATE TABLE "users" (
     "role" "Role" NOT NULL DEFAULT 'STUDENT',
     "emailVerified" TIMESTAMP(3),
     "image" TEXT,
-    "onboarded" BOOLEAN NOT NULL DEFAULT false,
     "parentId" TEXT,
     "createdById" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -94,6 +96,7 @@ CREATE TABLE "exams" (
     "gradeLevel" INTEGER NOT NULL,
     "aiGenerated" BOOLEAN NOT NULL DEFAULT true,
     "aiConfig" JSONB,
+    "hasAdvancedStructure" BOOLEAN NOT NULL DEFAULT false,
     "duration" INTEGER,
     "totalMarks" INTEGER NOT NULL DEFAULT 100,
     "passingMarks" INTEGER NOT NULL DEFAULT 50,
@@ -110,9 +113,26 @@ CREATE TABLE "exams" (
 );
 
 -- CreateTable
+CREATE TABLE "exam_sections" (
+    "id" TEXT NOT NULL,
+    "examId" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "instructions" TEXT,
+    "totalMarks" INTEGER NOT NULL DEFAULT 0,
+    "order" INTEGER NOT NULL DEFAULT 0,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "exam_sections_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "questions" (
     "id" TEXT NOT NULL,
     "examId" TEXT NOT NULL,
+    "sectionId" TEXT,
     "type" "QuestionType" NOT NULL,
     "question" TEXT NOT NULL,
     "options" JSONB,
@@ -126,6 +146,8 @@ CREATE TABLE "questions" (
     "explanation" TEXT,
     "gradingRubric" JSONB,
     "sampleAnswer" TEXT,
+    "questionNumber" TEXT,
+    "context" TEXT,
     "order" INTEGER NOT NULL DEFAULT 0,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -223,6 +245,7 @@ CREATE TABLE "exam_assignments" (
     "startDate" TIMESTAMP(3),
     "allowLateSubmission" BOOLEAN NOT NULL DEFAULT false,
     "maxAttempts" INTEGER NOT NULL DEFAULT 1,
+    "attemptsUsed" INTEGER NOT NULL DEFAULT 0,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -435,6 +458,7 @@ CREATE TABLE "study_modules" (
     "createdBy" TEXT NOT NULL,
     "xpReward" INTEGER NOT NULL DEFAULT 100,
     "badgeType" TEXT,
+    "status" "ModulePublishStatus" NOT NULL DEFAULT 'PUBLISHED',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -622,6 +646,7 @@ CREATE TABLE "Tier" (
     "maxExams" INTEGER NOT NULL DEFAULT 10,
     "maxStudyModules" INTEGER NOT NULL DEFAULT 10,
     "maxStudents" INTEGER NOT NULL DEFAULT 50,
+    "totalAttemptsPool" INTEGER NOT NULL DEFAULT 100,
     "validityDays" INTEGER NOT NULL DEFAULT 30,
     "price" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "currency" TEXT NOT NULL DEFAULT 'RWF',
@@ -640,6 +665,7 @@ CREATE TABLE "UserTier" (
     "examsCreated" INTEGER NOT NULL DEFAULT 0,
     "studyModulesCreated" INTEGER NOT NULL DEFAULT 0,
     "studentsCreated" INTEGER NOT NULL DEFAULT 0,
+    "attemptsUsed" INTEGER NOT NULL DEFAULT 0,
     "assignedBy" TEXT,
     "assignedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "expiresAt" TIMESTAMP(3),
@@ -681,13 +707,16 @@ CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationTok
 CREATE INDEX "exams_creatorId_idx" ON "exams"("creatorId");
 
 -- CreateIndex
+CREATE INDEX "exam_sections_examId_idx" ON "exam_sections"("examId");
+
+-- CreateIndex
 CREATE INDEX "questions_examId_idx" ON "questions"("examId");
 
 -- CreateIndex
-CREATE INDEX "exam_attempts_studentId_idx" ON "exam_attempts"("studentId");
+CREATE INDEX "exam_attempts_examId_studentId_idx" ON "exam_attempts"("examId", "studentId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "exam_attempts_examId_studentId_key" ON "exam_attempts"("examId", "studentId");
+CREATE INDEX "exam_attempts_studentId_idx" ON "exam_attempts"("studentId");
 
 -- CreateIndex
 CREATE INDEX "answers_attemptId_idx" ON "answers"("attemptId");
@@ -891,7 +920,13 @@ ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId"
 ALTER TABLE "exams" ADD CONSTRAINT "exams_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "exam_sections" ADD CONSTRAINT "exam_sections_examId_fkey" FOREIGN KEY ("examId") REFERENCES "exams"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "questions" ADD CONSTRAINT "questions_examId_fkey" FOREIGN KEY ("examId") REFERENCES "exams"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "questions" ADD CONSTRAINT "questions_sectionId_fkey" FOREIGN KEY ("sectionId") REFERENCES "exam_sections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "exam_attempts" ADD CONSTRAINT "exam_attempts_examId_fkey" FOREIGN KEY ("examId") REFERENCES "exams"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
