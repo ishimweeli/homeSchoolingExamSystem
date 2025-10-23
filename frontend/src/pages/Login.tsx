@@ -9,15 +9,33 @@ export default function Login() {
   const [emailOrUsername, setEmailOrUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  clearError();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    clearError()
-    try {
-      await login(emailOrUsername, password)
-      navigate('/dashboard')
-    } catch (_) { }
+  try {
+    const result = await login(emailOrUsername, password); 
+
+    if (!result) {
+      throw new Error('Login failed');
+    }
+
+    const { organizations } = result; 
+
+    // Set activeOrgId for Axios header
+    let activeOrgId = localStorage.getItem('activeOrgId');
+    if (!activeOrgId && organizations.length > 0) {
+      activeOrgId = organizations[0].id;
+      localStorage.setItem('activeOrgId', activeOrgId);
+    }
+
+    navigate('/dashboard');
+  } catch (err) {
+    console.error('Login failed', err);
   }
+};
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">

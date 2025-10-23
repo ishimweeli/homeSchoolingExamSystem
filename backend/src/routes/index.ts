@@ -11,6 +11,7 @@ import dashboardRoutes from './dashboardRoutes';
 import resultsRoutes from './resultsRoutes';
 import studentsRoutes from './studentsRoutes';
 import tierRoutes from './tierRoutes';
+import inviteRoutes from './inviteRoutes'
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/results', resultsRoutes);
 router.use('/students', studentsRoutes);
 router.use('/', tierRoutes); // Tier routes at root level
+router.use('/invites', inviteRoutes);
 
 export default router;

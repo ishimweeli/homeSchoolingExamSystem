@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { useAuthStore } from '../stores/authStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -29,18 +30,39 @@ class ApiService {
   }
 
   private setupInterceptors() {
-    this.instance.interceptors.request.use(
-      (config: InternalAxiosRequestConfig) => {
-        const token = this.getToken();
-        if (token && config.headers) {
-          config.headers.Authorization = `Bearer ${token}`;
+    this.instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = this.getToken();
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  const orgExcludedRoutes = [
+    '/auth',
+    '/tiers',
+    '/payments',
+    '/accept-invite',
+  ];
+
+  const urlPath = config.url?.replace(config.baseURL ?? '', '') || '';
+  const shouldExcludeOrg = orgExcludedRoutes.some(route => urlPath.startsWith(route));
+
+  if (!shouldExcludeOrg && config.headers) {
+    const activeOrgString = localStorage.getItem('activeOrg');
+    if (activeOrgString) {
+      try {
+        const activeOrg = JSON.parse(activeOrgString);
+        if (activeOrg?.id) {
+          config.headers['x-org-id'] = activeOrg.id;
         }
-        return config;
-      },
-      (error: AxiosError) => {
-        return Promise.reject(error);
+      } catch (e) {
+        console.error('Failed to parse activeOrg from localStorage', e);
       }
-    );
+    }
+  }
+
+  return config;
+});
+
 
     this.instance.interceptors.response.use(
       (response) => response,
@@ -73,6 +95,7 @@ class ApiService {
       }
     );
   }
+
 
   private async refreshToken(): Promise<string> {
     const refreshToken = localStorage.getItem('refreshToken');
@@ -113,7 +136,7 @@ class ApiService {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     this.stopTokenValidation();
-    
+
     // Notify subscribers about token expiration
     if (this.onTokenExpiredCallback) {
       this.onTokenExpiredCallback();
@@ -190,27 +213,28 @@ class ApiService {
         console.log('Tokens expired, clearing authentication');
         this.clearTokens();
         // Trigger logout in auth store
-        if (window.location.pathname !== '/login' && 
-            window.location.pathname !== '/register' &&
-            !window.location.pathname.startsWith('/auth/')) {
+        if (window.location.pathname !== '/login' &&
+          window.location.pathname !== '/register' &&
+          !window.location.pathname.startsWith('/auth/')) {
           window.location.href = '/login';
         }
       }
     }
   }
 
-  // Auth methods
+  // AuthService.ts
   async login(emailOrUsername: string, password: string) {
     const response = await this.instance.post('/auth/login', {
       emailOrUsername,
       password,
     });
 
-    const { token, refreshToken, user } = response.data.data;
+    const { user, token, refreshToken, organizations } = response.data.data;
+
     this.setToken(token);
     this.setRefreshToken(refreshToken);
 
-    return { user, token };
+    return { user, token, refreshToken, organizations }; // ✅ return the full data
   }
 
   getGoogleOAuthUrl(): string {
@@ -227,11 +251,11 @@ class ApiService {
   }) {
     const response = await this.instance.post('/auth/register', data);
 
-    const { token, refreshToken, user } = response.data.data;
+    const { token, refreshToken, user, organizations } = response.data.data;
     this.setToken(token);
     this.setRefreshToken(refreshToken);
 
-    return { user, token };
+    return { user, token, organizations };
   }
 
   async logout() {
@@ -292,7 +316,7 @@ class ApiService {
     return res.data.data;
   }
 
-  async createStudent(payload: { name: string; username: string; password: string }) {
+  async createStudent(payload: { name: string; username: string; password: string; email: string }) {
     const res = await this.instance.post('/users/students', payload);
     return res.data.data;
   }
@@ -368,6 +392,36 @@ class ApiService {
     const res = await this.instance.post('/study-modules/generate', payload);
     return res.data.data;
   }
+
+  async sendInvite(data: { email: string, role: string }) {
+    const res = await this.instance.post('/invites', data);
+    return res.data;
+  }
+
+  async getSentInvites() {
+    const res = await this.instance.get('/invites');
+    return res.data.invites;
+  }
+
+  async cancelInvite(inviteId: string) {
+    const res = await this.instance.put(`/invites/${inviteId}`);
+    return res.data;
+  }
+
+  async acceptInvite(payload: { code: string }) {
+    const res = await this.instance.post('/invites/accept', payload);
+    return res.data;
+  }
+
+  async getOrganizations() {
+    const res = await this.instance.get('/auth/organizations');
+    return res.data;
+  }
+  async resendInviteByCode(code: string) {
+    const response = await this.instance.post('/invites/resend', { code });
+    return response.data;
+  }
+
 }
 
 export const api = new ApiService();
