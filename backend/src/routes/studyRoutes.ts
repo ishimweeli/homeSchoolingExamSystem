@@ -14,7 +14,8 @@ import {
   publishStudyModule,
   deleteStudyModule,
   getModuleAssignments,
-  getModuleStudentProgress
+  getModuleStudentProgress,
+  updateStudyModule
 } from '../controllers/studyModuleController';
 import { checkTierLimit } from '../middleware/tierLimits';
 
@@ -76,6 +77,8 @@ router.post('/:id/assign', verifyToken, requireRole('PARENT', 'TEACHER'), assign
 
 // AI generation
 router.post('/generate', verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), checkTierLimit('CREATE_STUDY_MODULE'), generateStudyModuleWithAI);
+
+router.put("/:id", verifyToken, requireRole('PARENT', 'TEACHER', 'ADMIN'), checkTierLimit('CREATE_STUDY_MODULE'), updateStudyModule);
 
 // Interactive learning routes
 router.post('/:id/start', verifyToken, startStudyModule);

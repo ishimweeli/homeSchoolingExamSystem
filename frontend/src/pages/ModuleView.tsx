@@ -134,7 +134,7 @@ export default function ModuleView() {
   };
 
   const getDifficultyColor = (difficulty: string) => {
-    switch(difficulty) {
+    switch (difficulty) {
       case 'BEGINNER': return 'bg-green-100 text-green-800';
       case 'INTERMEDIATE': return 'bg-yellow-100 text-yellow-800';
       case 'ADVANCED': return 'bg-red-100 text-red-800';
@@ -143,7 +143,7 @@ export default function ModuleView() {
   };
 
   const getLessonIcon = (type: string) => {
-    switch(type) {
+    switch (type) {
       case 'video': return Video;
       case 'text': return FileText;
       case 'quiz': return Brain;
@@ -221,14 +221,39 @@ export default function ModuleView() {
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-6">
-        <button
-          onClick={() => navigate('/modules')}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Modules
-        </button>
+      <div className="mb-6 text-sm">
+        <div className='flex justify-between items-center mb-4'>
+          <button
+            onClick={() => navigate('/modules')}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          >
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            Back to Modules
+          </button>
+
+          {/* Action Buttons for Teachers */}
+          {user?.role === 'TEACHER' && (
+            <div className="flex justify-end gap-3 text-xs">
+              <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center">
+                <Share2 className="w-4 h-4 mr-2" />
+                Share
+              </button>
+              <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </button>
+              <button
+                onClick={() => navigate(`/modules/${id}/edit`)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Module
+              </button>
+            </div>
+          )}
+        </div>
+
+
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-start">
@@ -331,23 +356,21 @@ export default function ModuleView() {
                     key={lesson.id}
                     onClick={() => handleLessonClick(index)}
                     disabled={isLocked}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 text-left ${
-                      isActive
-                        ? 'border-purple-500 bg-purple-50'
-                        : isLocked
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 text-left ${isActive
+                      ? 'border-purple-500 bg-purple-50'
+                      : isLocked
                         ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-50'
                         : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center flex-1">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
-                          lesson.completed
-                            ? 'bg-green-100'
-                            : isActive
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${lesson.completed
+                          ? 'bg-green-100'
+                          : isActive
                             ? 'bg-purple-100'
                             : 'bg-gray-100'
-                        }`}>
+                          }`}>
                           {lesson.completed ? (
                             <CheckCircle className="w-5 h-5 text-green-600" />
                           ) : isLocked ? (
@@ -357,9 +380,8 @@ export default function ModuleView() {
                           )}
                         </div>
                         <div className="flex-1">
-                          <h3 className={`font-medium text-sm ${
-                            isActive ? 'text-purple-900' : 'text-gray-900'
-                          }`}>
+                          <h3 className={`font-medium text-sm ${isActive ? 'text-purple-900' : 'text-gray-900'
+                            }`}>
                             {lesson.title}
                           </h3>
                           <p className="text-xs text-gray-500 mt-1">
@@ -473,11 +495,10 @@ export default function ModuleView() {
                     <button
                       onClick={handlePreviousLesson}
                       disabled={currentLesson === 0}
-                      className={`px-4 py-2 rounded-lg flex items-center ${
-                        currentLesson === 0
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
+                      className={`px-4 py-2 rounded-lg flex items-center ${currentLesson === 0
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
                     >
                       <ChevronLeft className="w-5 h-5 mr-2" />
                       Previous
@@ -538,27 +559,6 @@ export default function ModuleView() {
           )}
         </div>
       </div>
-
-      {/* Action Buttons for Teachers */}
-      {user?.role === 'TEACHER' && (
-        <div className="mt-6 flex justify-end gap-3">
-          <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center">
-            <Share2 className="w-4 h-4 mr-2" />
-            Share
-          </button>
-          <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center">
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </button>
-          <button
-            onClick={() => navigate(`/modules/${id}/edit`)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Edit Module
-          </button>
-        </div>
-      )}
     </div>
   );
 }

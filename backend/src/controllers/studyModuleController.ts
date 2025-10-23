@@ -31,11 +31,85 @@ const generateStudyModuleSchema = z.object({
   country: z.enum(['USA', 'UK', 'AUSTRALIA', 'NEW_ZEALAND', 'RWANDA', 'GENERAL']).default('GENERAL'),
 });
 
+// 🧩 Step content schema
+const stepContentSchema = z.object({
+  type: z.string().optional(),
+  question: z.string().optional(),
+  explanation: z.string().optional(),
+  learningText: z.string().optional(),
+  correctAnswer: z.union([
+    z.string(),
+    z.boolean(),
+    z.record(z.string(), z.string())
+  ]).optional(),
+  options: z.array(z.string()).optional(),
+  pairs: z.record(z.string(), z.string()).optional(),
+  text: z.string().optional(),
+  examples: z.array(z.string()).optional(),
+});
+
+// 🧩 Step schema
+const stepSchema = z.object({
+  id: z.string().optional(),
+  lessonId: z.string().optional(),
+  stepNumber: z.number().optional(),
+  type: z.string().optional(),
+  title: z.string().optional(),
+  content: stepContentSchema.optional(),
+  passingScore: z.number().optional(),
+  timeLimit: z.number().nullable().optional(),
+  order: z.number().optional(),
+});
+
+// 🧩 Lesson schema
+const lessonSchema = z.object({
+  id: z.string().optional(),
+  moduleId: z.string().optional(),
+  lessonNumber: z.number().optional(),
+  title: z.string().optional(),
+  content: z.string().optional(), // stored as JSON string
+  minScore: z.number().optional(),
+  maxAttempts: z.number().optional(),
+  xpReward: z.number().optional(),
+  order: z.number().optional(),
+  steps: z.array(stepSchema).optional(),
+});
+
+// 🧩 Main Update Study Module Schema
+export const updateStudyModuleSchema = z.object({
+  id: z.string(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  topic: z.string().optional(),
+  subject: z.string().optional(),
+  gradeLevel: z.number().min(0).max(13).optional(),
+  aiGenerated: z.boolean().optional(),
+  difficulty: z.enum(["easy", "medium", "hard"]).optional(),
+  totalLessons: z.number().min(1).max(10).optional(),
+  passingScore: z.number().min(0).max(100).optional(),
+  livesEnabled: z.boolean().optional(),
+  maxLives: z.number().min(0).max(10).optional(),
+  xpReward: z.number().min(0).optional(),
+  badgeType: z.string().optional(),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+  includeGamification: z.boolean().optional(),
+  country: z.enum(["USA", "UK", "AUSTRALIA", "NEW_ZEALAND", "RWANDA", "GENERAL"]).optional(),
+  lessons: z.array(lessonSchema).optional(),
+  topics: z.array(z.string()).optional(),
+  updatedAt: z.string().datetime().optional(),
+});
+
+
 const submitStepAnswerSchema = z.object({
   stepId: z.string(),
   answer: z.any(),
   timeSpent: z.number(),
 });
+
+interface BatchGenerationResult {
+  lessons: any[];
+  error?: string;
+}
 
 // Create study module manually
 export const createStudyModule = async (req: Request, res: Response) => {
@@ -91,35 +165,35 @@ export const createStudyModule = async (req: Request, res: Response) => {
 function fixMalformedJSON(jsonString: string): string {
   // Remove completely invalid control characters
   let fixed = jsonString.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F]/g, '');
-  
+
   // Try to intelligently fix newlines and tabs inside string values
   // This is a heuristic approach - replace literal newlines that appear between quotes
   let result = '';
   let inString = false;
   let escapeNext = false;
-  
+
   for (let i = 0; i < fixed.length; i++) {
     const char = fixed[i];
     const prevChar = i > 0 ? fixed[i - 1] : '';
-    
+
     if (escapeNext) {
       result += char;
       escapeNext = false;
       continue;
     }
-    
+
     if (char === '\\') {
       result += char;
       escapeNext = true;
       continue;
     }
-    
+
     if (char === '"' && prevChar !== '\\') {
       inString = !inString;
       result += char;
       continue;
     }
-    
+
     // If we're inside a string, escape literal newlines and tabs
     if (inString) {
       if (char === '\n') {
@@ -135,7 +209,7 @@ function fixMalformedJSON(jsonString: string): string {
       result += char;
     }
   }
-  
+
   return result;
 }
 
@@ -272,6 +346,89 @@ export const generateCourseOutline = async (req: Request, res: Response) => {
   }
 };
 
+async function generateLessonBatch(
+  params: {
+    subject: string;
+    gradeLevel: number;
+    topic: string;
+    difficulty: string;
+    batchSize: number;
+    batchStartLesson: number;
+    totalLessonsInCourse: number;
+    previousLessons: string;
+    includeGamification: boolean;
+    country: string;
+  },
+  aiClient: any
+): Promise<BatchGenerationResult> {
+  const { batchStartLesson, batchSize, totalLessonsInCourse } = params;
+
+  console.log(`🔄 Generating lessons ${batchStartLesson}-${batchStartLesson + batchSize - 1} of ${totalLessonsInCourse}`);
+
+  const promptConfig = generateStudyModulePrompt({
+    subject: params.subject,
+    gradeLevel: params.gradeLevel,
+    topic: params.topic,
+    difficulty: params.difficulty,
+    lessonCount: batchSize,
+    includeGamification: params.includeGamification,
+    country: params.country,
+    batchStartLesson,
+    totalLessonsInCourse,
+    previousLessons: params.previousLessons,
+  });
+
+  try {
+    const completion = await aiClient.chat.completions.create(
+      {
+        model: getAIModel(),
+        messages: [
+          { role: 'system', content: promptConfig.systemMessage },
+          { role: 'user', content: promptConfig.userPrompt },
+        ],
+        temperature: promptConfig.temperature,
+        max_tokens: promptConfig.maxTokens,
+      },
+      { timeout: 90000 } // 90 second timeout
+    );
+
+    console.log(`✅ Batch ${batchStartLesson}-${batchStartLesson + batchSize - 1} completed`);
+    console.log('  - Usage:', completion.usage);
+
+    const aiResponse = completion.choices[0].message.content;
+    if (!aiResponse) {
+      throw new Error('AI returned no content');
+    }
+
+    // Clean response
+    let cleaned = aiResponse.trim();
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+
+    // Fix malformed JSON
+    cleaned = fixMalformedJSON(cleaned);
+
+    // Parse JSON
+    const batchData = JSON.parse(cleaned);
+
+    if (!batchData.lessons || !Array.isArray(batchData.lessons)) {
+      throw new Error('Invalid response structure: missing lessons array');
+    }
+
+    console.log(`✅ Parsed ${batchData.lessons.length} lessons from batch`);
+
+    return { lessons: batchData.lessons };
+  } catch (error) {
+    console.error(`❌ Failed to generate batch ${batchStartLesson}-${batchStartLesson + batchSize - 1}:`, error);
+    return {
+      lessons: [],
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+
 // Generate study module with AI (Duolingo-style)
 export const generateStudyModuleWithAI = async (req: Request, res: Response) => {
   try {
@@ -289,492 +446,127 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
       });
     }
 
-    // 🎯 CONSERVATIVE APPROACH: Single API call for maximum reliability
-    // Max 10 lessons ensures consistent quality, no duplication, perfect progression
-    // Split-merge disabled for 100% reliability
-    const shouldSplit = false; // Always use single request for best quality
-    
-    let moduleData: any;
+    const BATCH_SIZE = 2; // Generate 2 lessons at a time
+    const totalLessons = validatedData.lessonCount;
+    const batches = Math.ceil(totalLessons / BATCH_SIZE);
 
-    if (shouldSplit) {
-      // Split into two parts for 100% reliability
-      const halfLessons = Math.ceil(validatedData.lessonCount / 2);
-      
-      console.log('📦 SPLITTING Complete Course into TWO parts for 100% reliability:');
-      console.log('  - Part 1: Lessons 1-' + halfLessons);
-      console.log('  - Part 2: Lessons ' + (halfLessons + 1) + '-' + validatedData.lessonCount);
+    console.log('📦 SEQUENTIAL BATCH GENERATION STRATEGY:');
+    console.log(`  - Total lessons requested: ${totalLessons}`);
+    console.log(`  - Batch size: ${BATCH_SIZE} lessons`);
+    console.log(`  - Total batches: ${batches}`);
 
-      // ========== PART 1: Generate first half ==========
-      const promptConfig1 = generateStudyModulePrompt({
-        subject: validatedData.subject,
-        gradeLevel: validatedData.gradeLevel,
-        topic: validatedData.topic,
-        difficulty: validatedData.difficulty,
-        lessonCount: halfLessons,
-        includeGamification: validatedData.includeGamification,
-        country: validatedData.country,
-      });
+    const allLessons: any[] = [];
+    let previousLessonsContext = '';
 
-      console.log('🚀 [PART 1] Sending AI request with:');
-      console.log('  - Lessons:', halfLessons);
-      console.log('  - Max Tokens:', promptConfig1.maxTokens);
+    // Generate lessons batch by batch
+    for (let batchIndex = 0; batchIndex < batches; batchIndex++) {
+      const batchStartLesson = batchIndex * BATCH_SIZE + 1;
+      const lessonsInThisBatch = Math.min(BATCH_SIZE, totalLessons - allLessons.length);
 
-      const completion1 = await aiClient.chat.completions.create({
-        model: getAIModel(),
-        messages: [
-          {
-            role: 'system',
-            content: promptConfig1.systemMessage,
-          },
-          {
-            role: 'user',
-            content: promptConfig1.userPrompt,
-          },
-        ],
-        temperature: promptConfig1.temperature,
-        max_tokens: promptConfig1.maxTokens,
-      });
+      console.log(`\n🚀 [BATCH ${batchIndex + 1}/${batches}] Starting generation...`);
 
-      console.log('✅ [PART 1] Completed. Usage:', completion1.usage);
+      const result = await generateLessonBatch(
+        {
+          subject: validatedData.subject,
+          gradeLevel: validatedData.gradeLevel,
+          topic: validatedData.topic,
+          difficulty: validatedData.difficulty,
+          batchSize: lessonsInThisBatch,
+          batchStartLesson,
+          totalLessonsInCourse: totalLessons,
+          previousLessons: previousLessonsContext,
+          includeGamification: validatedData.includeGamification || false,
+          country: validatedData.country || 'GENERAL',
+        },
+        aiClient
+      );
 
-      const aiResponse1 = completion1.choices[0].message.content;
-      if (!aiResponse1) throw new Error('Part 1: AI did not return any content');
-
-      console.log('📝 [PART 1] Response length:', aiResponse1.length);
-
-      let cleaned1 = aiResponse1.trim();
-      if (cleaned1.startsWith('```')) {
-        cleaned1 = cleaned1.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-      }
-      
-      // Fix malformed JSON using helper function
-      console.log('🧹 [PART 1] Fixing malformed JSON...');
-      cleaned1 = fixMalformedJSON(cleaned1);
-      
-      let part1Data;
-      try {
-        part1Data = JSON.parse(cleaned1);
-      } catch (parseErr: any) {
-        console.error('❌ [PART 1] JSON parse failed:', parseErr.message);
-        console.error('Error at position:', parseErr.message.match(/position (\d+)/)?.[1]);
-        console.error('First 500 chars:', cleaned1.substring(0, 500));
-        console.error('Last 500 chars:', cleaned1.substring(cleaned1.length - 500));
-        throw new Error('Part 1: AI response is not valid JSON. Please try again.');
-      }
-      
-      console.log('✅ [PART 1] JSON parsed successfully, lessons:', part1Data.lessons?.length);
-
-      // ========== PART 2: Generate second half (CONTINUATION) ==========
-      const remainingLessons = validatedData.lessonCount - halfLessons;
-      
-      // Extract lesson titles from Part 1 to avoid duplication
-      const part1Topics = part1Data.lessons.map((l: any) => l.title).join(', ');
-      
-      console.log('📋 Part 1 covered topics:', part1Topics);
-      
-      const promptConfig2 = generateStudyModulePrompt({
-        subject: validatedData.subject,
-        gradeLevel: validatedData.gradeLevel,
-        topic: validatedData.topic,
-        difficulty: validatedData.difficulty,
-        lessonCount: remainingLessons,
-        includeGamification: validatedData.includeGamification,
-        country: validatedData.country,
-        isPart2: true, // NEW FLAG
-        part1Topics: part1Topics, // Pass covered topics
-      });
-
-      console.log('🚀 [PART 2] Sending AI request with:');
-      console.log('  - Lessons:', remainingLessons);
-      console.log('  - Max Tokens:', promptConfig2.maxTokens);
-
-      const completion2 = await aiClient.chat.completions.create({
-        model: getAIModel(),
-        messages: [
-          {
-            role: 'system',
-            content: promptConfig2.systemMessage,
-          },
-          {
-            role: 'user',
-            content: promptConfig2.userPrompt,
-          },
-        ],
-        temperature: promptConfig2.temperature,
-        max_tokens: promptConfig2.maxTokens,
-      });
-
-      console.log('✅ [PART 2] Completed. Usage:', completion2.usage);
-
-      const aiResponse2 = completion2.choices[0].message.content;
-      if (!aiResponse2) throw new Error('Part 2: AI did not return any content');
-
-      console.log('📝 [PART 2] Response length:', aiResponse2.length);
-
-      let cleaned2 = aiResponse2.trim();
-      if (cleaned2.startsWith('```')) {
-        cleaned2 = cleaned2.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-      }
-      
-      // Fix malformed JSON using helper function
-      console.log('🧹 [PART 2] Fixing malformed JSON...');
-      cleaned2 = fixMalformedJSON(cleaned2);
-      
-      let part2Data;
-      try {
-        part2Data = JSON.parse(cleaned2);
-      } catch (parseErr: any) {
-        console.error('❌ [PART 2] JSON parse failed:', parseErr.message);
-        console.error('Error at position:', parseErr.message.match(/position (\d+)/)?.[1]);
-        console.error('First 500 chars:', cleaned2.substring(0, 500));
-        console.error('Last 500 chars:', cleaned2.substring(cleaned2.length - 500));
-        throw new Error('Part 2: AI response is not valid JSON. Please try again.');
-      }
-      
-      console.log('✅ [PART 2] JSON parsed successfully, lessons:', part2Data.lessons?.length);
-
-      // ========== MERGE: Combine both parts ==========
-      console.log('🔗 Merging Part 1 (' + part1Data.lessons.length + ' lessons) + Part 2 (' + part2Data.lessons.length + ' lessons)');
-
-      // Check for duplicate/similar lesson titles
-      const part1Titles = part1Data.lessons.map((l: any) => l.title.toLowerCase());
-      const duplicates: string[] = [];
-
-      part2Data.lessons.forEach((lesson: any) => {
-        const title = lesson.title.toLowerCase();
-        const isDuplicate = part1Titles.some((p1Title: string) => {
-          // Check for exact match or very similar titles (>70% similarity)
-          if (title === p1Title) return true;
-          const similarity = title.split(' ').filter((word: string) => p1Title.includes(word)).length / title.split(' ').length;
-          return similarity > 0.7;
-        });
-        if (isDuplicate) {
-          duplicates.push(lesson.title);
+      if (result.error || result.lessons.length === 0) {
+        console.error(`❌ [BATCH ${batchIndex + 1}] Failed:`, result.error);
+        
+        // If this is not the first batch and we have some lessons, continue with what we have
+        if (allLessons.length > 0) {
+          console.warn(`⚠️ Proceeding with ${allLessons.length} successfully generated lessons`);
+          break;
         }
-      });
-
-      if (duplicates.length > 0) {
-        console.warn('⚠️ WARNING: Detected potential duplicate lessons in Part 2:', duplicates);
-        console.warn('   Part 1 covered:', part1Topics);
-        console.warn('   These Part 2 lessons may overlap - consider manual review');
+        
+        // If first batch fails, return error
+        throw new Error(`Failed to generate initial lessons: ${result.error}`);
       }
 
-      // Renumber lessons in part 2
-      part2Data.lessons.forEach((lesson: any, idx: number) => {
-        lesson.lessonNumber = halfLessons + idx + 1;
-      });
+      // Add lessons to collection
+      allLessons.push(...result.lessons);
 
-      moduleData = {
-        title: part1Data.title || `${validatedData.subject} - ${validatedData.topic} (Complete Course)`,
-        description: part1Data.description || part2Data.description,
-        lessons: [...part1Data.lessons, ...part2Data.lessons],
-        xpRewards: part1Data.xpRewards || part2Data.xpRewards,
-        badges: [...(part1Data.badges || []), ...(part2Data.badges || [])].filter((v, i, a) => a.indexOf(v) === i),
-        mergeWarnings: duplicates.length > 0 ? `Detected ${duplicates.length} potentially duplicate lessons. Manual review recommended.` : null,
-      };
+      // Update context for next batch
+      const lessonTitles = result.lessons.map((l: any) => `${l.lessonNumber}. ${l.title}`).join('\n    ');
+      previousLessonsContext += `\n    ${lessonTitles}`;
 
-      console.log('✅ Merge complete! Total lessons:', moduleData.lessons.length);
-      if (duplicates.length > 0) {
-        console.log('⚠️ MERGE WARNING: Found potential duplicates - flagged for user review');
-      }
+      console.log(`✅ [BATCH ${batchIndex + 1}] Complete. Total lessons so far: ${allLessons.length}/${totalLessons}`);
 
-    } else {
-      // ========== SINGLE REQUEST: Normal flow ==========
-      const promptConfig = generateStudyModulePrompt({
-        subject: validatedData.subject,
-        gradeLevel: validatedData.gradeLevel,
-        topic: validatedData.topic,
-        difficulty: validatedData.difficulty,
-        lessonCount: validatedData.lessonCount,
-        includeGamification: validatedData.includeGamification,
-        country: validatedData.country,
-      });
-
-      console.log('🚀 Sending AI request with:');
-      console.log('  - Model:', getAIModel());
-      console.log('  - Max Tokens:', promptConfig.maxTokens);
-      console.log('  - Temperature:', promptConfig.temperature);
-      console.log('  - System Message Length:', promptConfig.systemMessage.length);
-      console.log('  - User Prompt Length:', promptConfig.userPrompt.length);
-      console.log('  - Grade Level:', validatedData.gradeLevel, '(0 = Complete Course)');
-
-      // Retry logic for handling incomplete responses
-      let completion;
-      let retryCount = 0;
-      const maxRetries = 2;
-
-      while (retryCount <= maxRetries) {
-        try {
-          completion = await aiClient.chat.completions.create(
-            {
-              model: getAIModel(),
-              messages: [
-                {
-                  role: 'system',
-                  content: promptConfig.systemMessage,
-                },
-                {
-                  role: 'user',
-                  content: promptConfig.userPrompt,
-                },
-              ],
-              temperature: promptConfig.temperature,
-              max_tokens: promptConfig.maxTokens,
-            },
-            {
-              timeout: 120000, // 120 second timeout
-            }
-          );
-          break; // Success - exit retry loop
-        } catch (retryError: any) {
-          retryCount++;
-          console.error(`❌ Attempt ${retryCount}/${maxRetries + 1} failed:`, retryError.message);
-
-          if (retryCount > maxRetries) {
-            throw retryError; // Give up after max retries
-          }
-
-          // Wait before retrying (exponential backoff)
-          const waitTime = 1000 * Math.pow(2, retryCount - 1);
-          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-      }
-
-      if (!completion) {
-        throw new Error('Failed to get completion after retries');
-      }
-
-      console.log('✅ AI request completed successfully');
-      console.log('  - Usage:', completion.usage);
-
-      const aiResponse = completion.choices[0].message.content;
-      
-      if (!aiResponse) {
-        throw new Error('AI did not return any content');
-      }
-
-      console.log('📝 AI Response received');
-      console.log('  - Length:', aiResponse.length, 'characters');
-      console.log('  - First 200 chars:', aiResponse.substring(0, 200));
-      console.log('  - Last 200 chars:', aiResponse.substring(aiResponse.length - 200));
-
-      // Strip markdown code fences if present
-      let cleanedResponse = aiResponse.trim();
-      if (cleanedResponse.startsWith('```')) {
-        cleanedResponse = cleanedResponse.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-        console.log('✂️ Stripped markdown code fences');
-      }
-
-      // Fix malformed JSON using helper function
-      console.log('🧹 Fixing malformed JSON...');
-      cleanedResponse = fixMalformedJSON(cleanedResponse);
-
-      // Check if JSON looks incomplete (missing closing braces)
-      const openBraces = (cleanedResponse.match(/\{/g) || []).length;
-      const closeBraces = (cleanedResponse.match(/\}/g) || []).length;
-      const openBrackets = (cleanedResponse.match(/\[/g) || []).length;
-      const closeBrackets = (cleanedResponse.match(/\]/g) || []).length;
-      
-      if (openBraces !== closeBraces || openBrackets !== closeBrackets) {
-        console.error('⚠️ JSON appears incomplete!');
-        console.error(`  - Open braces: ${openBraces}, Close braces: ${closeBraces}`);
-        console.error(`  - Open brackets: ${openBrackets}, Close brackets: ${closeBrackets}`);
-        console.error(`  - Response length: ${cleanedResponse.length} chars`);
-        console.error('Last 1000 chars:', cleanedResponse.substring(cleanedResponse.length - 1000));
-        throw new Error('AI response was cut off mid-generation. Try reducing lesson count to 8 or fewer lessons.');
-      }
-
-      try {
-        moduleData = JSON.parse(cleanedResponse);
-        console.log('✅ JSON parsed successfully, lessons:', moduleData.lessons?.length);
-      } catch (parseError: any) {
-        console.error('❌ Failed to parse AI response:', parseError.message);
-        console.error('Error at position:', parseError.message.match(/position (\d+)/)?.[1]);
-        console.error('First 500 chars:', cleanedResponse.substring(0, 500));
-        console.error('Last 500 chars:', cleanedResponse.substring(cleanedResponse.length - 500));
-        throw new Error('AI response was not valid JSON. Please try again.');
+      // Add small delay between batches to avoid rate limiting
+      if (batchIndex < batches - 1) {
+        console.log('⏳ Waiting 2 seconds before next batch...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 
-    if (!moduleData.lessons || moduleData.lessons.length === 0) {
-      throw new Error('AI did not generate any lessons. Please try again with different parameters.');
-    }
+    console.log(`\n🎉 GENERATION COMPLETE: ${allLessons.length} lessons generated`);
 
-    console.log(`✅ AI generated ${moduleData.lessons.length} lessons with steps`);
-
-    // Normalize and enforce minimum quality/structure on AI output
-    try {
-      moduleData.lessons = moduleData.lessons.map((lesson: any, index: number) => {
-        const safeLesson = lesson || {};
-        safeLesson.title = safeLesson.title || `Lesson ${index + 1}`;
-        safeLesson.content = safeLesson.content || {};
-        const theoryText = typeof safeLesson.content.theory === 'string' && safeLesson.content.theory.trim().length > 0
-          ? safeLesson.content.theory
-          : `Introduction to ${validatedData.topic}`;
-
-        // Ensure curriculum alignment field exists
-        if (!Array.isArray(safeLesson.content.curriculumAlignment)) {
-          safeLesson.content.curriculumAlignment = [
-            {
-              standardCode: `${validatedData.subject.toUpperCase()}.G${validatedData.gradeLevel}.${String(validatedData.topic).replace(/\s+/g, '').toUpperCase()}`,
-              description: `Grade ${validatedData.gradeLevel} ${validatedData.subject}: Mastery of ${validatedData.topic}`,
-            },
-          ];
-        }
-
-        // Ensure steps array exists
-        const originalSteps = Array.isArray(safeLesson.steps) ? safeLesson.steps : [];
-
-        // Helper creators for default steps
-        const makeMC = (q: string, options: string[], correctLetter: 'A'|'B'|'C'|'D', explanation: string) => ({
-          type: 'PRACTICE_EASY',
-          title: 'Multiple Choice',
-          content: {
-            type: 'multiple_choice',
-            question: q,
-            options: options.map((opt, i) => `${String.fromCharCode(65 + i)}) ${opt}`),
-            correctAnswer: correctLetter,
-            explanation,
+    // Normalize lessons
+    const normalizedLessons = allLessons.map((lesson: any, index: number) => {
+      const safeLesson = lesson || {};
+      safeLesson.lessonNumber = index + 1; // Ensure correct numbering
+      safeLesson.title = safeLesson.title || `Lesson ${index + 1}`;
+      safeLesson.content = safeLesson.content || {};
+      
+      // Ensure curriculum alignment
+      if (!Array.isArray(safeLesson.content.curriculumAlignment)) {
+        safeLesson.content.curriculumAlignment = [
+          {
+            standardCode: `${validatedData.subject.toUpperCase()}.G${validatedData.gradeLevel}.${String(validatedData.topic).replace(/\s+/g, '').toUpperCase()}`,
+            description: `Grade ${validatedData.gradeLevel} ${validatedData.subject}: Mastery of ${validatedData.topic}`,
           },
-        });
+        ];
+      }
 
-        const makeFillBlank = (q: string, answer: string, explanation: string) => ({
-          type: 'PRACTICE_EASY',
-          title: 'Fill in the Blank',
-          content: {
-            type: 'fill-in-the-blank',
-            question: q,
-            correctAnswer: answer,
-            explanation,
-          },
-        });
-
-        const makeTrueFalse = (q: string, answer: 'True'|'False', explanation: string) => ({
-          type: 'PRACTICE_EASY',
-          title: 'True or False',
-          content: {
-            type: 'true_false',
-            question: q,
-            correctAnswer: answer,
-            explanation,
-          },
-        });
-
-        const makeMatching = (pairs: {active: string; passive: string;}[], explanation: string) => ({
-          type: 'PRACTICE_MEDIUM',
-          title: 'Match Active to Passive',
-          content: {
-            type: 'matching',
-            question: 'Match each active sentence to its passive form',
-            pairs,
-            explanation,
-          },
-        });
-
-        const steps: any[] = [...originalSteps];
-
-        // Determine present exercise types
-        const hasMC = steps.some(s => (s?.content?.type || '').includes('multiple_choice'));
-        const hasFill = steps.some(s => ['fill-in-the-blank','fill_in_blank','text_entry'].includes(String(s?.content?.type)));
-        const hasTF = steps.some(s => String(s?.content?.type) === 'true_false');
-        const hasMatching = steps.some(s => String(s?.content?.type) === 'matching');
-
-        // Add missing core exercise types
-        if (!hasMC) {
-          steps.push(
-            makeMC(
-              `Which sentence best demonstrates the concept in this lesson about ${validatedData.topic}?`,
-              [
-                `A common statement unrelated to ${validatedData.topic}`,
-                `A statement demonstrating ${validatedData.topic}`,
-                `An off-topic sentence`,
-                `A vague statement`,
-              ],
-              'B',
-              `Option B directly applies ${validatedData.topic}.`
-            )
-          );
+      // Ensure steps array and learningText
+      const steps = Array.isArray(safeLesson.steps) ? safeLesson.steps : [];
+      
+      const normalizedSteps = steps.map((step: any) => {
+        if (step.type !== 'THEORY' && step.content && !step.content.learningText) {
+          step.content.learningText = `<p>Understanding ${validatedData.topic} requires attention to detail. Review the concept carefully before answering.</p><p>Apply what you've learned to identify the correct answer. Take your time and think through each option.</p>`;
         }
-
-        if (!hasFill) {
-          steps.push(
-            makeFillBlank(
-              `Complete correctly related to ${validatedData.topic}: "The report ___ (complete) yesterday."`,
-              'was completed',
-              'Use appropriate tense and structure.'
-            )
-          );
-        }
-
-        if (!hasTF) {
-          steps.push(
-            makeTrueFalse(
-              `This sentence correctly applies ${validatedData.topic}: "The project was finished on time."`,
-              'True',
-              'It emphasizes the result rather than the doer.'
-            )
-          );
-        }
-
-        if (!hasMatching) {
-          steps.push(
-            makeMatching(
-              [
-                { active: 'The team won the match.', passive: 'The match was won by the team.' },
-                { active: 'They will announce the winner.', passive: 'The winner will be announced.' },
-              ],
-              'Match each active sentence with its passive transformation.'
-            )
-          );
-        }
-
-        // Ensure at least 5 steps total (pad with a short review if needed)
-        while (steps.length < 5) {
-          steps.push(
-            makeFillBlank(
-              `Write one short sentence applying ${validatedData.topic}.`,
-              `${validatedData.topic} applied`,
-              'Any correct application demonstrating understanding is acceptable.'
-            )
-          );
-        }
-
-        // Return normalized lesson
-        return {
-          ...safeLesson,
-          steps,
-        };
+        return step;
       });
-    } catch (normErr) {
-      console.warn('⚠️ Failed to fully normalize AI module; proceeding with raw output.', normErr);
-    }
 
-    // Create study module with lessons and steps
+      return { ...safeLesson, steps: normalizedSteps };
+    });
+
+    // Create study module with all lessons
     const studyModule = await prisma.studyModule.create({
       data: {
-        title: moduleData.title || `${validatedData.subject} - ${validatedData.topic}`,
-        description: moduleData.description,
+        title: `${validatedData.subject} - ${validatedData.topic}`,
+        description: `Comprehensive study module on ${validatedData.topic} for Grade ${validatedData.gradeLevel}`,
         topic: validatedData.topic,
         subject: validatedData.subject,
         gradeLevel: validatedData.gradeLevel,
         difficulty: validatedData.difficulty,
-        totalLessons: validatedData.lessonCount,
+        totalLessons: normalizedLessons.length,
         passingScore: 80,
         livesEnabled: true,
         maxLives: 3,
-        xpReward: moduleData.xpRewards?.completion || 100,
-        badgeType: moduleData.badges?.[0],
+        xpReward: 100,
+        badgeType: 'Mastery',
         createdBy: (req as any).user.id,
         aiGenerated: true,
         lessons: {
-          create: moduleData.lessons.map((lesson: any, index: number) => ({
+          create: normalizedLessons.map((lesson: any, index: number) => ({
             lessonNumber: index + 1,
             title: lesson.title,
             content: lesson.content,
             minScore: 80,
             maxAttempts: 3,
-            xpReward: moduleData.xpRewards?.perLesson || 10,
+            xpReward: 10,
             order: index + 1,
             steps: {
               create: lesson.steps.map((step: any, stepIndex: number) => ({
@@ -807,52 +599,33 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
     // Increment tier usage
     await incrementTierUsage((req as any).user.id, 'CREATE_STUDY_MODULE');
 
-    console.log(`🎉 Study module created successfully: ${studyModule.title}`);
-    console.log(`📊 Contains ${studyModule.lessons.length} lessons with ${studyModule.lessons.reduce((sum, l) => sum + l.steps.length, 0)} total steps`);
+    console.log(`🎉 Study module created: ${studyModule.title}`);
+    console.log(`📊 ${studyModule.lessons.length} lessons, ${studyModule.lessons.reduce((sum, l) => sum + l.steps.length, 0)} total steps`);
 
     res.status(201).json({
       success: true,
       data: studyModule,
-      message: `Study module created with ${studyModule.lessons.length} lessons`,
+      message: `Study module created with ${studyModule.lessons.length} lessons (generated in ${batches} batches)`,
     });
+
   } catch (error) {
     console.error('❌ Generate study module error:', error);
-    
-    // More detailed error logging
+
     if (error instanceof Error) {
       console.error('  - Error message:', error.message);
-      console.error('  - Error type:', (error as any).type);
-      console.error('  - Error name:', error.name);
       console.error('  - Error stack:', error.stack);
     }
-    
-    // Check if it's a timeout or token limit issue
+
     const errorMessage = error instanceof Error ? error.message : '';
-    
-    if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+
+    if (errorMessage.includes('timeout')) {
       return res.status(500).json({
         success: false,
-        message: 'AI request timed out. Try reducing the number of lessons or complexity.',
+        message: 'AI request timed out. Please try again.',
         error: 'REQUEST_TIMEOUT'
       });
     }
-    
-    if (errorMessage.includes('max_tokens') || errorMessage.includes('token limit')) {
-      return res.status(500).json({
-        success: false,
-        message: 'Token limit exceeded. Try reducing the number of lessons.',
-        error: 'TOKEN_LIMIT_EXCEEDED'
-      });
-    }
 
-    if (errorMessage.includes('invalid json') || errorMessage.includes('Unexpected end of JSON')) {
-      return res.status(500).json({
-        success: false,
-        message: 'AI response was incomplete or cut off. The response size may be too large. Try: 1) Reduce lesson count to 5-8, or 2) Use a simpler topic, or 3) Try again (sometimes it works on retry).',
-        error: 'INCOMPLETE_AI_RESPONSE'
-      });
-    }
-    
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : 'Failed to generate study module',
@@ -860,6 +633,155 @@ export const generateStudyModuleWithAI = async (req: Request, res: Response) => 
     });
   }
 };
+
+
+export const updateStudyModule = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // ✅ Validate input (ensure `id` exists)
+    const validatedData = updateStudyModuleSchema.parse({ ...req.body, id });
+
+    // ✅ Check ownership
+    const existingModule = await prisma.studyModule.findUnique({
+      where: { id },
+      include: { lessons: { include: { steps: true } } },
+    });
+
+    if (!existingModule) {
+      return res.status(404).json({ success: false, message: "Module not found" });
+    }
+
+    if (existingModule.createdBy !== (req as any).user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only update your own modules",
+      });
+    }
+
+    // ✅ Extract top-level and nested data
+    const { lessons, ...rest } = validatedData;
+
+    // ✅ Update module itself
+    const updatedModule = await prisma.studyModule.update({
+      where: { id },
+      data: {
+        ...rest,
+        // Prisma handles updatedAt automatically (@updatedAt)
+      },
+    });
+
+    // ✅ Handle nested lessons + steps
+    if (lessons && lessons.length > 0) {
+      for (const lesson of lessons) {
+        // 🧩 Update existing lesson
+        if (lesson.id) {
+          await prisma.studyLesson.update({
+            where: { id: lesson.id },
+            data: {
+              title: lesson.title,
+              lessonNumber: lesson.lessonNumber,
+              content: lesson.content ? JSON.parse(lesson.content) : undefined,
+              minScore: lesson.minScore,
+              maxAttempts: lesson.maxAttempts,
+              xpReward: lesson.xpReward,
+              order: lesson.order,
+            },
+          });
+
+          // 🧩 Update or create lesson steps
+          if (lesson.steps && lesson.steps.length > 0) {
+            for (const step of lesson.steps) {
+              if (step.id) {
+                await prisma.studyStep.update({
+                  where: { id: step.id },
+                  data: {
+                    title: step.title,
+                    type: step.type as any,
+                    stepNumber: step.stepNumber,
+                    content: step.content,
+                    passingScore: step.passingScore,
+                    timeLimit: step.timeLimit ?? null,
+                    order: step.order,
+                  },
+                });
+              } else {
+                // Create new step if it doesn’t exist
+                await prisma.studyStep.create({
+                  data: {
+                    lessonId: lesson.id!,
+                    title: step.title ?? "Untitled Step",
+                    type: step.type as any,
+                    stepNumber: step.stepNumber ?? 1,
+                    content: step.content ?? {},
+                    passingScore: step.passingScore ?? 80,
+                    timeLimit: step.timeLimit ?? null,
+                    order: step.order ?? 1,
+                  },
+                });
+              }
+            }
+          }
+        } else {
+          // 🧩 Create new lesson (if new)
+          const createdLesson = await prisma.studyLesson.create({
+            data: {
+              moduleId: id,
+              title: lesson.title ?? "Untitled Lesson",
+              lessonNumber: lesson.lessonNumber ?? 1,
+              content: lesson.content ? JSON.parse(lesson.content) : {},
+              minScore: lesson.minScore ?? 80,
+              maxAttempts: lesson.maxAttempts ?? 3,
+              xpReward: lesson.xpReward ?? 10,
+              order: lesson.order ?? 1,
+            },
+          });
+
+          // Create nested steps if provided
+          if (lesson.steps && lesson.steps.length > 0) {
+            await prisma.studyStep.createMany({
+              data: lesson.steps.map((step) => ({
+                lessonId: createdLesson.id,
+                title: step.title ?? "Untitled Step",
+                type: step.type as any,
+                stepNumber: step.stepNumber ?? 1,
+                content: step.content ?? {},
+                passingScore: step.passingScore ?? 80,
+                timeLimit: step.timeLimit ?? null,
+                order: step.order ?? 1,
+              })),
+            });
+          }
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: updatedModule,
+      message: "Study module updated successfully",
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: error.errors,
+      });
+    }
+
+    console.error("Update study module error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update study module",
+    });
+  }
+};
+
 
 // Get all study modules
 export const getStudyModules = async (req: Request, res: Response) => {
@@ -1450,7 +1372,7 @@ export const updateModuleProgress = async (req: Request, res: Response) => {
     // Calculate overall progress
     const totalLessons = module.lessons.length;
     const totalSteps = module.lessons.reduce((sum, lesson) => sum + lesson.steps.length, 0);
-    
+
     // Calculate completed steps (all steps before current position)
     let completedSteps = 0;
     for (let i = 0; i < currentLesson - 1; i++) {
@@ -1461,9 +1383,9 @@ export const updateModuleProgress = async (req: Request, res: Response) => {
     }
     // Add steps completed in current lesson
     completedSteps += currentStep - 1;
-    
+
     const overallProgress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
-    
+
     console.log(`📊 Progress calculation: ${completedSteps}/${totalSteps} steps = ${overallProgress}%`);
 
     // Update assignment progress
@@ -2101,17 +2023,17 @@ export const getModuleStudentProgress = async (req: Request, res: Response) => {
     const completionRate =
       totalAssigned > 0
         ? Math.round(
-            (assignments.filter((a) => a.status === 'COMPLETED').length /
-              totalAssigned) *
-              100
-          )
+          (assignments.filter((a) => a.status === 'COMPLETED').length /
+            totalAssigned) *
+          100
+        )
         : 0;
     const averageProgress =
       totalAssigned > 0
         ? Math.round(
-            assignments.reduce((sum, a) => sum + a.overallProgress, 0) /
-              totalAssigned
-          )
+          assignments.reduce((sum, a) => sum + a.overallProgress, 0) /
+          totalAssigned
+        )
         : 0;
     const studentsInProgress = assignments.filter(
       (a) => a.status === 'IN_PROGRESS'

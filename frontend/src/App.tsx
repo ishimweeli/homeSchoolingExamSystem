@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import ProfessionalLanding from './pages/ProfessionalLanding'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import Home from './pages/Home'
 import Onboarding from './pages/Onboarding'
 import AuthCallback from './pages/AuthCallback'
 import ForgotPassword from './pages/ForgotPassword'
@@ -16,7 +15,6 @@ import ExamView from './pages/ExamView'
 import ExamCreate from './pages/ExamCreate'
 import ExamEdit from './pages/ExamEdit'
 import ExamCreateSimple from './pages/ExamCreateSimple'
-import ExamsListSimple from './pages/ExamsListSimple'
 import Exams from './pages/Exams'
 import { ExamTaker } from './components/ExamTaker'
 import ExamResults from './pages/ExamResults'
@@ -34,6 +32,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AdminTiers from './pages/AdminTiers'
 import RequireRole from './components/RequireRole'
 import Forbidden from './pages/Forbidden'
+import ModuleEdit from './pages/ModuleEdit'
 
 function App() {
   return (
@@ -65,6 +64,7 @@ function App() {
         <Route path="/modules" element={<ProtectedRoute><StudyModules /></ProtectedRoute>} />
         <Route path="/modules/create" element={<ProtectedRoute><ModuleCreate /></ProtectedRoute>} />
         <Route path="/modules/:id" element={<ProtectedRoute><ModuleView /></ProtectedRoute>} />
+        <Route path="/modules/:id/edit" element={<ProtectedRoute><ModuleEdit /></ProtectedRoute>} />
         <Route path="/modules/:id/take" element={<ProtectedRoute><ModuleTaker /></ProtectedRoute>} />
         <Route path="/modules/:id/student-progress" element={<ProtectedRoute><ModuleStudentProgress /></ProtectedRoute>} />
         <Route path="/ai-tools" element={<ProtectedRoute><AITools /></ProtectedRoute>} />

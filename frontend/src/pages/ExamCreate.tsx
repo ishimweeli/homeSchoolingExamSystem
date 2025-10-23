@@ -174,7 +174,7 @@ export default function ExamCreate() {
         }))
       };
 
-      const response = await api.post('/exams', examData);
+      const response = await api.post(`/exams/${generatedExam?.id}/publish`, examData);
 
       if ((response as any)?.success) {
         setSuccess('Exam published successfully!');
