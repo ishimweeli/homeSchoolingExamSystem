@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { toast } from 'sonner';
+import { useAuthStore } from '../stores/authStore';
 
 interface Invite {
   id: string;
@@ -16,47 +17,65 @@ interface Invite {
   };
 }
 
+// Determine UI role based on global role and organization role
+const determineUIRole = (globalRole?: string, orgRole?: string) => {
+  // Global ADMIN role takes precedence
+  if (globalRole === 'ADMIN') {
+    return 'ADMIN';
+  }
+  
+  // Otherwise, map organization role
+  switch (orgRole) {
+    case 'OWNER':
+    case 'TEACHER':
+      return 'TEACHER';
+    case 'PARENT':
+      return 'PARENT';
+    case 'STUDENT':
+    default:
+      return 'STUDENT';
+  }
+};
+
 const InviteMembers = () => {
+  const { user, activeOrg } = useAuthStore();
+  const navigate = useNavigate();
+  
   const [invites, setInvites] = useState<Invite[]>([]);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'ADMIN' | 'TEACHER' | 'PARENT'>('PARENT');
   const [loading, setLoading] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState<Invite | null>(null);
-  const [userRole, setUserRole] = useState<string>('');
 
-  // Get current user's role from token or context
-const [activeOrg, setActiveOrg] = useState<{ id: string; name: string; role: string } | null>(null);
+  // Determine current user's UI role based on active organization
+  const userRole = determineUIRole(user?.role, (activeOrg as any)?.role);
 
-useEffect(() => {
-  const org = localStorage.getItem('activeOrg');
-  if (org) {
-    setActiveOrg(JSON.parse(org));
-  }
-}, []);
-
+  // Check if user has permission to access this page
+  useEffect(() => {
+    const allowedRoles = ['ADMIN', 'TEACHER'];
+    if (!allowedRoles.includes(userRole)) {
+      navigate('/dashboard');
+    }
+  }, [userRole, navigate]);
 
   // Role options based on user's role
   const getRoleOptions = () => {
-  const allRoles = [
-    { value: 'ADMIN', label: 'Admin', description: 'Can manage teachers, students, and view all data' },
-    { value: 'TEACHER', label: 'Teacher', description: 'Can create classes, exams, and invite parents' },
-    { value: 'PARENT', label: 'Parent', description: 'Can view their children\'s progress' },
-  ];
+    const allRoles = [
+      { value: 'ADMIN', label: 'Admin', description: 'Can manage teachers, students, and view all data' },
+      { value: 'TEACHER', label: 'Teacher', description: 'Can create classes, exams, and invite parents' },
+      { value: 'PARENT', label: 'Parent', description: 'Can view their children\'s progress' },
+    ];
 
-  if (!activeOrg) return [];
-
-  switch (activeOrg.role) {
-    case 'TEACHER':
-      return allRoles.filter(r => r.value === 'PARENT');
-    case 'ADMIN':
-      return allRoles.filter(r => ['TEACHER', 'PARENT'].includes(r.value));
-    case 'OWNER':
-      return allRoles; // Owners can invite anyone
-    default:
-      return [];
-  }
-};
-
+    // Filter based on current user's UI role
+    switch (userRole) {
+      case 'TEACHER':
+        return allRoles.filter(r => r.value === 'PARENT');
+      case 'ADMIN':
+        return allRoles.filter(r => ['TEACHER', 'PARENT'].includes(r.value));
+      default:
+        return [];
+    }
+  };
 
   const availableRoles = getRoleOptions();
 
@@ -142,13 +161,13 @@ useEffect(() => {
     <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-5xl mx-auto">
         <div className="mb-4">
-          <Link to="/" className="text-blue-600 font-semibold hover:underline">
-            ← Back to home
+          <Link to="/dashboard" className="text-blue-600 font-semibold hover:underline">
+            ← Back to dashboard
           </Link>
         </div>
         <h1 className="text-3xl font-bold mb-2">Invite Members</h1>
-        <p className="text-gray-600 mb-6">
-          Invite teachers, or parents to join your organization
+        <p className="text-gray-600 mb-2">
+          Invite teachers or parents to join your organization
         </p>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -207,6 +226,11 @@ useEffect(() => {
                 {userRole === 'TEACHER' && (
                   <span className="block mt-1">
                     As a teacher, you can only invite parents to monitor their children's progress.
+                  </span>
+                )}
+                {userRole === 'ADMIN' && (
+                  <span className="block mt-1">
+                    As an admin, you can invite teachers and parents to your organization.
                   </span>
                 )}
               </p>
