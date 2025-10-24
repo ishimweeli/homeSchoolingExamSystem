@@ -10,15 +10,21 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-// Role mapping from backend membership roles to frontend roles
-const mapOrgRoleToUIRole = (orgRole?: string) => {
+// Determine UI role based on global role and organization role
+const determineUIRole = (globalRole?: string, orgRole?: string) => {
+  // Global ADMIN role takes precedence
+  if (globalRole === 'ADMIN') {
+    return 'ADMIN';
+  }
+  
+  // Otherwise, map organization role
   switch (orgRole) {
     case 'OWNER':
-      return 'ADMIN'; // Treat OWNER as ADMIN in UI
     case 'TEACHER':
       return 'TEACHER';
     case 'PARENT':
       return 'PARENT';
+    case 'STUDENT':
     default:
       return 'STUDENT';
   }
@@ -47,9 +53,8 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Determine UI role based on active organization
- const userRole = mapOrgRoleToUIRole((activeOrg as any)?.role || 'STUDENT');
-
+  // Determine UI role based on global role and active organization role
+  const userRole = determineUIRole(user?.role, (activeOrg as any)?.role);
 
   // Ensure authenticated and load organizations
   useEffect(() => {
