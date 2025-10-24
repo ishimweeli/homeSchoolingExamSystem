@@ -16,6 +16,9 @@ services:
 
   # Backend API
   backend:
+    # Use pre-built image from registry for production
+    # image: registry.digitalocean.com/homeschool-registry/homeschool-backend:latest
+    # Or build locally (development/testing)
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -64,6 +67,9 @@ services:
 
   # Frontend React App
   frontend:
+    # Use pre-built image from registry for production
+    # image: registry.digitalocean.com/homeschool-registry/homeschool-frontend:latest
+    # Or build locally (development/testing)
     build:
       context: ./frontend
       dockerfile: Dockerfile
