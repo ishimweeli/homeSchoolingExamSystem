@@ -108,3 +108,9 @@ export const optionalAuth = async (
 
   next();
 };
+
+// Alias for verifyToken for better readability
+export const requireAuth = verifyToken;
+
+// Middleware to require admin role
+export const requireAdmin = [verifyToken, requireRole('ADMIN', 'OWNER')];

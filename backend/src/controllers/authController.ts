@@ -126,19 +126,19 @@ export const register = async (req: Request, res: Response) => {
         switch (user.role) {
           case 'TEACHER':
             orgType = OrgType.SOLO_TEACHER;
-            membershipRole = Role.OWNER;
+            membershipRole = 'OWNER' as any;
             break;
           case 'PARENT':
             orgType = OrgType.FAMILY;
-            membershipRole = Role.OWNER;
+            membershipRole = 'OWNER' as any;
             break;
           case 'ADMIN':
             orgType = OrgType.SCHOOL;
-            membershipRole = Role.OWNER;
+            membershipRole = 'OWNER' as any;
             break;
           default:
             orgType = OrgType.FAMILY;
-            membershipRole = Role.OWNER;
+            membershipRole = 'OWNER' as any;
         }
 
         // 2️⃣ Create Organization

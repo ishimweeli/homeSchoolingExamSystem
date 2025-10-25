@@ -24,22 +24,51 @@ services:
     depends_on:
       - redis
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
+      # Server Configuration
+      NODE_ENV: production
       PORT: 5000
-      DATABASE_URL: ${DATABASE_URL}
+
+      # Database (Neon PostgreSQL)
+      DATABASE_URL: postgresql://user:password@your-neon-endpoint.neon.tech/database?sslmode=require
+
+      # Redis
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      FLUTTERWAVE_PUBLIC_KEY: ${FLUTTERWAVE_PUBLIC_KEY}
-      FLUTTERWAVE_SECRET_KEY: ${FLUTTERWAVE_SECRET_KEY}
-      FLUTTERWAVE_ENCRYPTION_KEY: ${FLUTTERWAVE_ENCRYPTION_KEY}
-      FLUTTERWAVE_WEBHOOK_SECRET: ${FLUTTERWAVE_WEBHOOK_SECRET}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5001}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
+
+      # JWT Authentication Secrets
+      JWT_SECRET: your_strong_jwt_secret_key_here_minimum_32_characters_long
+      JWT_REFRESH_SECRET: your_strong_jwt_refresh_secret_key_here_minimum_32_characters
+      JWT_EXPIRES_IN: 1h
+      JWT_REFRESH_EXPIRES_IN: 7d
+
+      # OpenAI API
+      OPENAI_API_KEY: sk-proj-your_openai_api_key_here
+      OPENAI_MODEL: gpt-4o-mini
+
+      # Flutterwave Payment Gateway
+      FLUTTERWAVE_PUBLIC_KEY: FLWPUBK_TEST-your_public_key_here
+      FLUTTERWAVE_SECRET_KEY: FLWSECK_TEST-your_secret_key_here
+      FLUTTERWAVE_ENCRYPTION_KEY: FLWSECK_TEST-your_encryption_key_here
+      FLUTTERWAVE_WEBHOOK_SECRET: your_webhook_secret_here
+      FLUTTERWAVE_REDIRECT_URL: http://localhost:5001/payment/callback
+      FLUTTERWAVE_CURRENCY: RWF
+
+      # Frontend URL (for CORS)
+      FRONTEND_URL: http://localhost:5001
+
+      # Email (SMTP)
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: your-email@gmail.com
+      SMTP_PASS: your-app-specific-password
+
+      # Google OAuth
+      GOOGLE_CLIENT_ID: your-google-client-id.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: your-google-client-secret
+
+      # Admin Account
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: ChangeThisSecurePassword123!
+
     ports:
       - "5000:5000"
     volumes:
@@ -52,6 +81,12 @@ services:
         npx prisma migrate deploy &&
         npm start
       "
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
 
   # Frontend React App
   frontend:
@@ -59,7 +94,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api}
+        VITE_API_URL: http://localhost:5000/api
     container_name: homeschool-frontend
     restart: unless-stopped
     ports:
@@ -68,6 +103,12 @@ services:
       - backend
     networks:
       - homeschool-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 
 volumes:
   redis-data:

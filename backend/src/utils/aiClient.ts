@@ -8,13 +8,13 @@ let openRouterClient: OpenAI | null = null;
  * through a single API with flexible pricing
  */
 export const getAIClient = (): OpenAI | null => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL;
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  const model = process.env.AI_MODEL;
 
   // Debug logging
   console.log('🔑 OpenRouter API Key Status:', apiKey ? `Found (${apiKey.substring(0, 15)}...)` : '❌ MISSING!');
   console.log('🌐 Base URL:', 'https://openrouter.ai/api/v1');
-  console.log('🤖 Model:', model || "openai/gpt-5-mini");
+  console.log('🤖 Model:', model || "openai/gpt-4o-mini");
 
   if (!openRouterClient && apiKey) {
     openRouterClient = new OpenAI({
@@ -38,7 +38,7 @@ export const getAIClient = (): OpenAI | null => {
  * Examples: "openai/gpt-4o-mini", "anthropic/claude-3-sonnet", "google/gemini-pro"
  */
 export const getAIModel = (customModel?: string): string => {
-  const model = process.env.OPENAI_MODEL;
+  const model = process.env.AI_MODEL;
 
 
   // If custom model is provided, use it
@@ -47,15 +47,15 @@ export const getAIModel = (customModel?: string): string => {
   }
 
   // Use environment variable if set, otherwise default to GPT-4o-mini
-  return model || 'openai/gpt-5-mini'
+  return model || 'openai/gpt-4o-mini'
 }
 
 /**
  * Check if AI services are available
  */
 export const isAIAvailable = (): boolean => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL;
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  const model = process.env.AI_MODEL;
 
   return !!apiKey && !!model;
 };

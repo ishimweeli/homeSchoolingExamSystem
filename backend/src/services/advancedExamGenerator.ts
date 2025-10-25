@@ -46,6 +46,7 @@ export async function generateAdvancedExam(config: AdvancedExamConfig, creatorId
       aiGenerated: true,
       status: 'DRAFT',
       creatorId,
+      organizationId: orgId,
       totalMarks: sections.reduce((sum, s) => sum + s.totalMarks, 0),
     },
   });
@@ -160,7 +161,7 @@ Make questions engaging, grade-appropriate, and educational.`;
           sectionId,
           type,
           question: qData.question,
-          options: qData.options ? JSON.stringify(qData.options) : null,
+          options: qData.options ? JSON.stringify(qData.options) : undefined,
           correctAnswer: JSON.stringify(qData.correctAnswer),
           marks,
           explanation: qData.explanation,
