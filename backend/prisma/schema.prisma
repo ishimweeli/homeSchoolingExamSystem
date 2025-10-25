@@ -102,6 +102,7 @@ model Exam {
   status               ExamStatus           @default(DRAFT)
   scheduledFor         DateTime?
   creatorId            String
+  organizationId       String
   instructions         String?
   allowedResources     String[]             @default([])
   createdAt            DateTime             @default(now()) @map("created_at")
@@ -111,10 +112,12 @@ model Exam {
   attempts             ExamAttempt[]
   sections             ExamSection[]
   creator              User                 @relation("ExamCreator", fields: [creatorId], references: [id])
+  organization         Organization         @relation(fields: [organizationId], references: [id])
   questions            Question[]
   standards            CurriculumStandard[] @relation("ExamStandards")
 
   @@index([creatorId])
+  @@index([organizationId])
   @@map("exams")
 }
 
@@ -788,6 +791,7 @@ model Organization {
   ownerId     String
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  exams       Exam[]
   invites     Invite[]
   memberships Membership[]
   owner       User         @relation("UserOrganizations", fields: [ownerId], references: [id])
@@ -832,6 +836,7 @@ model Invite {
 }
 
 enum Role {
+  OWNER
   ADMIN
   PARENT
   TEACHER
